@@ -127,3 +127,11 @@ Each item is explained in [testing.md](docs/testing.md#definition-of-done).
 - `./Scripts/lint.sh` is clean.
 - `grep -rln 'import AppKit\|import SwiftUI\|import Cocoa' Tinycast/Features/*/Model/` returns nothing.
 - Any doc your change made wrong is fixed in the same commit.
+
+## Local install contract
+
+- Every local delivery must build the `Release` target, install the resulting bundle at
+  `/Applications/Tinycast.app`, and launch that installed bundle. Never present a build product from
+  DerivedData as the app to use.
+- Use `./Scripts/build-install-and-run.sh`; it only replaces `/Applications/Tinycast.app` after a
+  successful build and retains the immediately previous installed bundle under `build/previous/`.
