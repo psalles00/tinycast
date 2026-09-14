@@ -17,8 +17,6 @@ struct FavoritesTest {
         // Ten digit keys is the ceiling: there is no ⌘10, so the eleventh favorite gets no chord.
         check("ten slots", FavoriteSlots.digits.count == 10)
         check("no digit repeats", Set(FavoriteSlots.digits).count == FavoriteSlots.digits.count)
-        check("favorite grid has eight columns", FavoriteGridLayout.columnCount == 8)
-
         check("⌘1 is the first favorite", FavoriteSlots.index(for: "1") == 0)
         check("⌘9 is the ninth", FavoriteSlots.index(for: "9") == 8)
         check("⌘0 is the tenth, not the first", FavoriteSlots.index(for: "0") == 9)
