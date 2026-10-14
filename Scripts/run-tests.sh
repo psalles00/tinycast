@@ -226,6 +226,7 @@ run palette-menu-click-test Tinycast/Platform/Appearance.swift \
                            Tinycast/Platform/WindowLevel.swift \
                            Tinycast/Platform/NotificationToken.swift \
                            Tinycast/DesignSystem/Interaction/KeyboardFocus.swift \
+                           Tinycast/PSCustomizations/PSPaletteWindowStyle.swift \
                            Tinycast/Palette/PalettePanel.swift
 run form-input-test        Tinycast/Platform/Appearance.swift \
                            Tinycast/DesignSystem/Theme.swift \

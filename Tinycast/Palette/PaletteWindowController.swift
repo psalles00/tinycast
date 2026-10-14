@@ -65,7 +65,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             let frontmost = NSWorkspace.shared.frontmostApplication
             let ownPID = NSRunningApplication.current.processIdentifier
             previousApp = frontmost?.processIdentifier == ownPID ? nil : frontmost
-            // Recorded even when another app is frontmost: our panels take key without activating.
+            // Record our own key window even while another application is frontmost.
             let key = NSApp.keyWindow
             // A mode switch re-shows the palette while it holds key; keep what it recorded then.
             if key !== panel { previousOwnWindow = key }
@@ -234,7 +234,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     /// Not for a dialog or a modal: hiding tears down a running command.
     func windowDidResignKey(_ notification: Notification) {
         guard isVisible, !core.isShowingDialog else { return }
-        if core.palette.menuOpen { return }
+        if core.palette.menuOpen || core.palette.isControlListOpen { return }
         // A file panel sets its own level under ours, so sink rather than dismiss.
         if NSApp.modalWindow != nil {
             panel?.level = .normal
@@ -246,15 +246,19 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     func windowDidBecomeKey(_ notification: Notification) {
         panel?.level = .palette
         DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
+            guard let self, let panel, panel.isVisible, panel.isKeyWindow else { return }
+            // Activation is asynchronous: request search focus after the window actually takes key.
+            if !core.palette.menuOpen, !core.palette.isControlListOpen, !core.palette.isEditingField {
+                core.palette.focusToken = UUID()
+            }
             // A re-summon leaves first responder where it was, so neither of these gets an event.
-            panel?.trackComposition()
-            if let context = panel?.fieldEditorContext {
+            panel.trackComposition()
+            if let context = panel.fieldEditorContext {
                 core.inputSourceSwitcher.applySession(to: context)
             }
             if queryWasPreserved {
                 queryWasPreserved = false
-                panel?.selectAllFieldEditorText()
+                panel.selectAllFieldEditorText()
             }
         }
     }

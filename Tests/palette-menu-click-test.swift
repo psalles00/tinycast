@@ -65,6 +65,9 @@ struct PaletteMenuClickTests {
         _ = NSApplication.shared
         let state = PaletteState()
         let panel = PalettePanel(rootView: Color.clear)
+        check(!panel.styleMask.contains(.nonactivatingPanel),
+              "the palette uses activating keyboard ownership from its initial creation")
+        check(!panel.hidesOnDeactivate, "the controller owns palette visibility during child-menu focus")
         panel.paletteState = state
         let view = PressView(frame: panel.contentView?.bounds ?? .zero)
         panel.contentView = view

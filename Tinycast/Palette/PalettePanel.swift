@@ -28,7 +28,7 @@ final class PalettePanel: NSPanel {
         }
     }
 
-    /// Nil until a field takes focus; a non-activating panel can only scope input to this.
+    /// Nil until a field takes focus; input-source switching is scoped to this editing context.
     var fieldEditorContext: NSTextInputContext? { fieldEditor?.inputContext }
 
     /// SwiftUI's text fields all edit through the window's one shared field editor.
@@ -258,12 +258,14 @@ final class PalettePanel: NSPanel {
         super.init(
             contentRect: NSRect(
                 x: 0, y: 0, width: Theme.Size.panelWidth, height: Theme.Size.panelHeight),
-            styleMask: [.borderless, .fullSizeContentView, .nonactivatingPanel],
+            styleMask: PSPaletteWindowStyle.styleMask,
             backing: .buffered,
             defer: false
         )
 
         isFloatingPanel = true
+        // The controller owns dismissal; transient child menus must not let AppKit hide the parent.
+        hidesOnDeactivate = false
         acceptsMouseMovedEvents = true
         level = .palette
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]

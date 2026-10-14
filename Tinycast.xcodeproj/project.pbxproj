@@ -544,6 +544,7 @@
 		9F82DA5A46BB39A6C6DD075D /* DialogRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28D150930C930F1FB5E2A31B /* DialogRequest.swift */; };
 		9F8806D46EBAF7058FC2EAEC /* PaletteRowIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52BD814D567DFEFD303B1750 /* PaletteRowIndex.swift */; };
 		A024F68213FEB918BEF31255 /* CountryZoneData.generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58D62BFB4EC604AE6171BBA3 /* CountryZoneData.generated.swift */; };
+		A071250D61CA40D5B729B2CB /* PSPaletteWindowStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71DC6CD63640F8CDCD3C0A0E /* PSPaletteWindowStyle.swift */; };
 		A0A247FFDB1EA278C0F6F813 /* BackupActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA8CBA97041AAA96C0B7FF2E /* BackupActions.swift */; };
 		A11EB7D1852FB3D56DDBE7C3 /* SystemActionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296F67E23BF91CFBC6D66385 /* SystemActionCoordinator.swift */; };
 		A1F267E9D9914DB60DEEE0AD /* DoubleTapDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83C54F3A609CD1C2CDF304FB /* DoubleTapDetector.swift */; };
@@ -1269,6 +1270,7 @@
 		6FF6DBC407666868DCE27C22 /* RoomRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomRunner.swift; sourceTree = "<group>"; };
 		709C3F8952A500267E1D8242 /* ModifierTapMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierTapMonitor.swift; sourceTree = "<group>"; };
 		70F987A185161E857B7A030B /* PaletteShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaletteShortcut.swift; sourceTree = "<group>"; };
+		71DC6CD63640F8CDCD3C0A0E /* PSPaletteWindowStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PSPaletteWindowStyle.swift; sourceTree = "<group>"; };
 		72DF1178CD8AD726AC6F9874 /* CalculatorCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalculatorCardView.swift; sourceTree = "<group>"; };
 		72F0F0DDA5FC1F6ED59E73E9 /* DoubleTapModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DoubleTapModifier.swift; sourceTree = "<group>"; };
 		730BF08D764698989DF963A0 /* MenuSearchShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuSearchShortcut.swift; sourceTree = "<group>"; };
@@ -3258,6 +3260,7 @@
 				E2F6BB2FC576F8263BE81763 /* PSFavoriteFolders.swift */,
 				AE36E700B71128AC5AC1236F /* PSFavoriteGridEntries.swift */,
 				CFC1894EC663DA7B49528B6A /* PSFavoritesCoordinator.swift */,
+				71DC6CD63640F8CDCD3C0A0E /* PSPaletteWindowStyle.swift */,
 				A23EEF1C64E8CF3A9467B611 /* PSShortcutConflictPolicy.swift */,
 			);
 			path = PSCustomizations;
@@ -4540,6 +4543,7 @@
 				1DE84BA5D2C1F9F6BE55EF10 /* PSFavoriteFolders.swift in Sources */,
 				11233625E8400866C647B260 /* PSFavoriteGridEntries.swift in Sources */,
 				4829E4411E792FD31A709A30 /* PSFavoritesCoordinator.swift in Sources */,
+				A071250D61CA40D5B729B2CB /* PSPaletteWindowStyle.swift in Sources */,
 				AFBB90DF13D16808B12111A7 /* PSShortcutConflictPolicy.swift in Sources */,
 				86C36C0885D5820E70184CF6 /* PaletteCoordinator.swift in Sources */,
 				8DCF330D30E59FFEE8C8E8CF /* PaletteDropGuideController.swift in Sources */,
