@@ -87,7 +87,6 @@ struct WindowLayoutEntry: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-/// A saved arrangement: these apps, at these sizes, at these positions, on these displays.
 struct WindowLayout: Codable, Hashable, Identifiable, Sendable {
     static let entryIDPrefix = "window-layout:"
     /// One glyph for every layout, and never the menu bar's own, which reads as the app itself.
@@ -99,25 +98,24 @@ struct WindowLayout: Codable, Hashable, Identifiable, Sendable {
     /// Opts the layout into the global `windowGap`, the way the tiling commands use it.
     var usesPreferredGap: Bool
     var entries: [WindowLayoutEntry]
-    var createdAt: Date
+    /// The one entry whose window ends a run frontmost; an ID rather than a flag, so it is one.
+    var frontmostEntryID: UUID?
 
     init(
         id: UUID = UUID(), name: String, iconSymbol: String? = nil,
         usesPreferredGap: Bool = true, entries: [WindowLayoutEntry] = [],
-        createdAt: Date = Date()
+        frontmostEntryID: UUID? = nil
     ) {
         self.id = id
         self.name = name
         self.iconSymbol = iconSymbol
         self.usesPreferredGap = usesPreferredGap
         self.entries = entries
-        self.createdAt = createdAt
+        self.frontmostEntryID = frontmostEntryID
     }
 
-    /// The glyph every surface draws for this layout.
     var symbol: String { iconSymbol ?? Self.sfSymbol }
 
-    /// The settings row's subtitle: what this layout actually does, in one line.
     var summary: String {
         let displays = Set(entries.map(\.display.uuid)).count
         let windows = entries.count == 1 ? "1 window" : "\(entries.count) windows"
@@ -125,6 +123,11 @@ struct WindowLayout: Codable, Hashable, Identifiable, Sendable {
     }
 
     var entryID: String { Self.entryIDPrefix + id.uuidString.lowercased() }
+
+    mutating func sanitizeEntries() {
+        entries = WindowLayoutEntry.sanitized(entries)
+        if !entries.contains(where: { $0.id == frontmostEntryID }) { frontmostEntryID = nil }
+    }
 
     static func id(fromEntryID entryID: String) -> UUID? {
         guard entryID.hasPrefix(entryIDPrefix) else { return nil }
@@ -140,7 +143,7 @@ struct WindowLayout: Codable, Hashable, Identifiable, Sendable {
 
     // Hand-written, so an added field keeps stored layouts and older backups readable.
     private enum CodingKeys: String, CodingKey {
-        case id, name, iconSymbol, usesPreferredGap, entries, createdAt
+        case id, name, iconSymbol, usesPreferredGap, entries, frontmostEntryID
     }
 
     init(from decoder: Decoder) throws {
@@ -151,7 +154,7 @@ struct WindowLayout: Codable, Hashable, Identifiable, Sendable {
         usesPreferredGap =
             try container.decodeIfPresent(Bool.self, forKey: .usesPreferredGap) ?? true
         entries = try container.decodeIfPresent([WindowLayoutEntry].self, forKey: .entries) ?? []
-        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        frontmostEntryID = try container.decodeIfPresent(UUID.self, forKey: .frontmostEntryID)
     }
 }
 

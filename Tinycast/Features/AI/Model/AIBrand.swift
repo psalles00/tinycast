@@ -1,9 +1,10 @@
 import Foundation
 
-/// The vendor behind a model, for the picker's row glyph: a template asset tinted like a symbol.
 enum AIBrand: String, CaseIterable, Sendable {
     case openAI, claude, gemini, openRouter, x, deepSeek, qwen, mistral, meta, kimi, miniMax
     case perplexity, zai
+    /// The marks of three installed routes; no model id resolves to them.
+    case grok, cursor, openCode
 
     var assetName: String {
         switch self {
@@ -20,6 +21,9 @@ enum AIBrand: String, CaseIterable, Sendable {
         case .miniMax: return "AIBrandMiniMax"
         case .perplexity: return "AIBrandPerplexity"
         case .zai: return "AIBrandZAI"
+        case .grok: return "AIBrandGrok"
+        case .cursor: return "AIBrandCursor"
+        case .openCode: return "AIBrandOpenCode"
         }
     }
 

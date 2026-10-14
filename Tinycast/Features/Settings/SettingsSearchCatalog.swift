@@ -1,12 +1,10 @@
 import Foundation
 
-/// One searchable place in Settings: a pane, or a row inside one of its `Form` sections.
 struct SettingsSearchEntry: Identifiable, Hashable, Sendable {
     let tab: SettingsTab
     /// Where picking this result lands; nil for the pane itself, which is its own result.
     let target: SettingsTarget?
     let title: String
-    /// Words a user might type that the visible title doesn't contain.
     let keywords: [String]
 
     /// Taking the pane from the target is what makes a row filed under the wrong pane unwritable.
@@ -38,7 +36,6 @@ struct SettingsSearchEntry: Identifiable, Hashable, Sendable {
 
     var id: String { "\(tab.title)/\(anchor?.title ?? "")/\(title)" }
 
-    /// The result row's second line — "General", or "General › Hyper Key".
     var breadcrumb: String {
         guard let anchor, anchor.title != tab.title else { return tab.title }
         return "\(tab.title) › \(anchor.title)"
@@ -108,10 +105,10 @@ enum SettingsSearchCatalog {
     // Pane order, then section order within a pane, so this reads as a table of contents.
 
     static let entries: [SettingsSearchEntry] =
-        general + applications + systemSettings
-        + systemActions + commands + quicklinks + fallbacks + ai + quickActions + fileSearch + notes
-        + snippets + navigation + windowManagement + clipboard + emoji + calendar
-        + extensions + permissions + backup + about
+        general + applications + systemSettings + systemActions + commands + quicklinks
+        + appleShortcuts + fallbacks + clipboard + snippets + fileSearch + windowManagement
+        + navigation + notes + calendar + emoji + ai + quickActions + dictation + extensions + permissions
+        + backup + about
 
     private static let general: [SettingsSearchEntry] = [
         .init(pane: .general, keywords: ["preferences", "settings"]),
@@ -119,17 +116,23 @@ enum SettingsSearchCatalog {
             .generalGlobalShortcuts, "App Launcher",
             keywords: ["hotkey", "shortcut", "summon", "palette"]),
         .init(
-            .generalSearch, "Learned ranking",
-            keywords: ["reset", "history", "order", "privacy"]),
+            .generalGeneral, "Launch at login",
+            keywords: ["startup", "login item", "start", "boot"]),
         .init(
-            .generalHyperKey, "Hyper Key",
-            keywords: ["modifier", "remap", "caps lock", "capslock"]),
+            .generalGeneral, "Show in menu bar",
+            keywords: ["menubar", "status item", "icon", "hide"]),
         .init(
-            .generalHyperKey, "Quick Press",
-            keywords: ["tap", "escape", "single press"]),
+            .generalGeneral, "Automatically check for updates",
+            keywords: ["software", "update", "automatic", "disable", "popup"]),
         .init(
-            .generalHyperKey, "Include Shift (⇧)",
-            keywords: ["modifier", "chord"]),
+            .generalGeneral, "Pop to Root Search",
+            keywords: ["reset", "timeout", "back"]),
+        .init(
+            .generalGeneral, "Escape Key Behavior",
+            keywords: ["escape", "esc", "back", "close", "navigate"]),
+        .init(
+            .generalGeneral, "Auto-switch input source",
+            keywords: ["keyboard", "layout", "language", "abc"]),
         .init(
             .generalAppearance, "Theme",
             keywords: ["dark", "light", "mode", "appearance"]),
@@ -137,11 +140,8 @@ enum SettingsSearchCatalog {
             .generalAppearance, "Interface size",
             keywords: ["text size", "font size", "scale", "zoom", "bigger", "larger", "legible"]),
         .init(
-            .generalAppearance, "Background transparency",
-            keywords: ["glass", "opacity", "blur", "translucency", "reset"]),
-        .init(
-            .generalAppearance, "Compact mode",
-            keywords: ["slim", "search bar", "small"]),
+            .generalAppearance, "Window mode",
+            keywords: ["compact", "expanded", "slim", "search bar", "small"]),
         .init(
             .generalAppearance, "Show favorites in compact mode",
             keywords: ["pinned", "apps", "compact"]),
@@ -152,30 +152,39 @@ enum SettingsSearchCatalog {
             .generalAppearance, "Drag to reposition",
             keywords: ["move", "position", "window"]),
         .init(
-            .generalGeneral, "Launch at login",
-            keywords: ["startup", "login item", "start", "boot"]),
+            .generalHyperKey, "Hyper Key",
+            keywords: ["modifier", "remap", "caps lock", "capslock"]),
         .init(
-            .generalGeneral, "Show in menu bar",
-            keywords: ["menubar", "status item", "icon", "hide"]),
+            .generalHyperKey, "Quick Press",
+            keywords: ["tap", "escape", "single press"]),
         .init(
-            .generalGeneral, "Pop to Root Search",
-            keywords: ["reset", "timeout", "back"]),
+            .generalHyperKey, "Include Shift (⇧)",
+            keywords: ["modifier", "chord"]),
         .init(
-            .generalGeneral, "Escape Key Behavior",
-            keywords: ["escape", "esc", "back", "close", "navigate"]),
+            .generalHyperKey, "Secure Input Compatibility",
+            keywords: ["password", "secure input", "right control"]),
         .init(
-            .generalGeneral, "Auto-switch input source",
-            keywords: ["keyboard", "layout", "language", "abc"])
+            .generalCalculator, "Number format",
+            keywords: ["decimal", "comma", "separator", "locale", "region", "thousands"]),
+        .init(
+            .generalSearch, "Show suggestions",
+            keywords: ["frequent", "recent", "recommended", "empty", "root search"]),
+        .init(
+            .generalSearch, "Search sensitivity",
+            keywords: ["fuzzy", "strict", "loose", "matching", "typo", "root search"]),
+        .init(
+            .generalSearch, "Learned ranking",
+            keywords: ["reset", "history", "order", "privacy"])
     ]
 
     private static let applications: [SettingsSearchEntry] = [
         .init(pane: .applications, keywords: ["apps", "index", "launcher"]),
         .init(
-            group: .applicationsSearchScopes, "Search Scopes",
-            keywords: ["folders", "indexed", "locations", "add folder"]),
-        .init(
             .applicationsApplications, "Enable Applications",
             keywords: ["hide apps", "visibility"]),
+        .init(
+            group: .applicationsSearchScopes, "Search Scopes",
+            keywords: ["folders", "indexed", "locations", "add folder"]),
         .init(
             group: .applicationsApplications, "Aliases and shortcuts",
             keywords: ["alias", "hotkey", "per app", "hide"])
@@ -232,8 +241,8 @@ enum SettingsSearchCatalog {
             .quicklinksBehaviour, "Open in a new window",
             keywords: ["browser", "tab"]),
         .init(
-            .quicklinksBehaviour, "When there's no selected text",
-            keywords: ["selection", "fallback", "placeholder"]),
+            .quicklinksBehaviour, "Pass selected text as argument",
+            keywords: ["selection", "hotkey", "shortcut", "argument"]),
         .init(
             .quicklinksBehaviour, "Confirm before deleting",
             keywords: ["ask", "delete", "prompt"]),
@@ -245,6 +254,16 @@ enum SettingsSearchCatalog {
             keywords: ["json", "backup"])
     ]
 
+    private static let appleShortcuts: [SettingsSearchEntry] = [
+        .init(pane: .appleShortcuts, keywords: ["shortcuts app", "automation", "workflow"]),
+        .init(
+            .appleShortcutsAppleShortcuts, "Enable Apple Shortcuts",
+            keywords: ["shortcuts app", "automation", "workflow"]),
+        .init(
+            group: .appleShortcutsShortcuts, "Aliases and shortcuts",
+            keywords: ["alias", "hotkey", "hide"])
+    ]
+
     private static let fallbacks: [SettingsSearchEntry] = [
         .init(
             pane: .fallbacks,
@@ -252,20 +271,23 @@ enum SettingsSearchCatalog {
     ]
 
     private static let ai: [SettingsSearchEntry] = [
-        .init(pane: .ai, keywords: ["chat", "llm", "model", "openai", "anthropic"]),
+        .init(
+            pane: .ai, keywords: ["chat", "quick ai", "llm", "model", "openai", "anthropic"]),
         .init(.aiAI, "Enable AI", keywords: ["chat", "llm"]),
         .init(
             .aiProviders, "Providers",
             keywords: [
-                "sign in", "connect", "codex", "claude", "opencode", "api key", "connection",
-                "base url", "openai", "anthropic", "ollama"
+                "sign in", "connect", "codex", "claude", "grok", "xai", "opencode", "cursor", "agent",
+                "api key", "connection", "base url", "openai", "anthropic", "ollama", "models",
+                "hide models"
             ]),
-        .init(.aiDefault, "Default model", keywords: ["llm", "gpt", "claude"]),
+        .init(.aiDefault, "Default model", keywords: ["llm", "gpt", "claude", "grok"]),
         .init(.aiDefault, "Reasoning effort", keywords: ["thinking", "effort", "deepseek"]),
         .init(.aiChat, "Web search", keywords: ["browse", "internet"]),
+        .init(.aiChat, "Tool call rounds", keywords: ["mcp", "tools", "limit", "loop", "agent", "unlimited"]),
         .init(
             .aiConversations, "Opens to",
-            keywords: ["new chat", "last", "summon"]),
+            keywords: ["new chat", "last", "summon", "resume", "window", "quick ai"]),
         .init(
             .aiConversations, "Start a new conversation after",
             keywords: ["idle", "timeout", "fresh"]),
@@ -307,22 +329,43 @@ enum SettingsSearchCatalog {
             keywords: ["language", "locale"])
     ]
 
+    private static let dictation: [SettingsSearchEntry] = [
+        .init(pane: .dictation, keywords: ["speech", "voice", "transcription", "microphone"]),
+        .init(.dictationDictation, "Enable Dictation"),
+        .init(.dictationCommands, "Shortcut behavior"),
+        .init(.dictationCommands, "Shortcut"),
+        .init(.dictationModel, "Model"),
+        .init(.dictationModel, "Engine", keywords: ["parakeet", "redux", "ultra", "qwen"]),
+        .init(.dictationModel, "Language"),
+        .init(.dictationMemory, "Release model from memory"),
+        .init(.dictationOutput, "Microphone"),
+        .init(.dictationOutput, "When finished"),
+        .init(.dictationOutput, "Adapt capitalization", keywords: ["uppercase", "lowercase", "sentence"]),
+        .init(.dictationOutput, "Insert while recording", keywords: ["live", "streaming", "chunk", "pause"])
+    ]
+
     private static let fileSearch: [SettingsSearchEntry] = [
         .init(
             pane: .fileSearch,
-            keywords: ["spotlight", "files", "folders", "find"]),
+            keywords: ["files", "folders", "find", "disk"]),
         .init(
             .fileSearchFileSearch, "Enable File Search",
-            keywords: ["spotlight", "index"]),
+            keywords: ["index", "disk"]),
+        .init(
+            group: .fileSearchFullDiskAccess, "Full Disk Access",
+            keywords: ["permission", "privacy", "grant", "fda"]),
+        .init(
+            group: .fileSearchIndex, "File index",
+            keywords: ["rebuild", "refresh", "reindex", "indexed files"]),
         .init(
             group: .fileSearchCommands, "File search commands",
             keywords: ["shortcut", "launcher"]),
         .init(
             group: .fileSearchSearchScopes, "Search Scopes",
-            keywords: ["folders", "locations", "home", "add folder"]),
+            keywords: ["folders", "locations", "home", "whole disk", "add folder"]),
         .init(
             group: .fileSearchIgnorePatterns, "Ignore Patterns",
-            keywords: ["exclude", "glob", "node_modules", "skip"])
+            keywords: ["exclude", "glob", "node_modules", "skip", "ignore folder"])
     ]
 
     private static let notes: [SettingsSearchEntry] = [
@@ -330,6 +373,15 @@ enum SettingsSearchCatalog {
         .init(
             .notesNotes, "Enable Notes",
             keywords: ["markdown", "scratchpad"]),
+        .init(
+            .notesOptions, "Render Markdown",
+            keywords: ["markdown", "formatting", "preview", "raw", "source"]),
+        .init(
+            .notesOptions, "Show Formatting Bar",
+            keywords: ["toolbar", "format bar", "buttons", "bold", "heading", "markdown"]),
+        .init(
+            .notesOptions, "Notes Folder",
+            keywords: ["location", "path", "dotfiles", "files", "markdown"]),
         .init(
             group: .notesCommands, "Notes commands",
             keywords: ["shortcut", "new note", "search notes"])
@@ -350,7 +402,7 @@ enum SettingsSearchCatalog {
             keywords: ["add", "keyword", "expansion"]),
         .init(
             .snippetsLibrary, "Snippets Folder",
-            keywords: ["reveal", "finder", "markdown", "files"])
+            keywords: ["reveal", "finder", "markdown", "files", "location", "path", "dotfiles"])
     ]
 
     private static let navigation: [SettingsSearchEntry] = [
@@ -385,16 +437,21 @@ enum SettingsSearchCatalog {
             .windowManagementOptions, "Gap between windows",
             keywords: ["padding", "spacing", "margin", "points"]),
         .init(
-            group: .windowManagementOptions, "Window commands",
-            keywords: ["shortcut", "left half", "maximize", "center"]),
+            .windowManagementOptions, "Shortcut preset",
+            keywords: ["rectangle", "magnet", "spectacle", "defaults", "import", "shortcuts"]),
         .init(
-            group: .windowManagementLayoutCommands, "Layout commands",
-            keywords: ["shortcut", "launcher", "create layout", "capture"]),
+            group: .windowManagementOptions, "Window commands",
+            keywords: ["shortcut", "alias", "left half", "maximize", "center"]),
+        .init(
+            group: .windowManagementLayoutCommands, "Layout and room commands",
+            keywords: [
+                "shortcut", "launcher", "create layout", "capture", "switch room", "create room"
+            ]),
         .init(
             group: .windowManagementLayouts, "Window Layouts",
             keywords: [
                 "layout", "arrangement", "workspace", "preset", "restore windows",
-                "multi display", "monitor"
+                "multi display", "monitor", "alias"
             ]),
         .init(
             .windowManagementLayouts, "Show layouts in launcher",
@@ -404,7 +461,25 @@ enum SettingsSearchCatalog {
             keywords: ["add", "create", "arrangement", "preset"]),
         .init(
             .windowManagementLayouts, "Create Layout from Current Windows",
-            keywords: ["capture", "snapshot", "current", "save arrangement"])
+            keywords: ["capture", "snapshot", "current", "save arrangement"]),
+        .init(
+            group: .windowManagementRooms, "Rooms",
+            keywords: [
+                "room", "project", "workspace", "tile", "focus", "columns", "grid", "stack",
+                "hide other apps", "switch project", "alias"
+            ]),
+        .init(
+            .windowManagementRooms, "Show rooms in launcher",
+            keywords: ["hide", "visibility", "search"]),
+        .init(
+            .windowManagementRooms, "New Room",
+            keywords: ["add", "create", "project", "windows"]),
+        .init(
+            group: .windowManagementCustomSizes, "Custom Sizes",
+            keywords: ["custom", "size", "resize", "dimensions", "pixels", "points", "percent", "alias"]),
+        .init(
+            .windowManagementCustomSizes, "New Custom Size",
+            keywords: ["add", "create", "resize", "window size"])
     ]
 
     private static let clipboard: [SettingsSearchEntry] = [
@@ -443,7 +518,10 @@ enum SettingsSearchCatalog {
             keywords: ["shortcut", "hotkey", "launcher", "picker"]),
         .init(
             .emojiAppearance, "Emoji Skin Tone",
-            keywords: ["colour", "color", "fitzpatrick", "default"])
+            keywords: ["colour", "color", "fitzpatrick", "default"]),
+        .init(
+            .emojiAppearance, "Column Count",
+            keywords: ["columns", "density", "zoom", "six", "eight", "ten"])
     ]
 
     private static let calendar: [SettingsSearchEntry] = [
@@ -454,11 +532,8 @@ enum SettingsSearchCatalog {
             .calendarCalendar, "Join meetings from Tinycast",
             keywords: ["zoom", "meet", "teams", "permission"]),
         .init(
-            .calendarSchedule, "Upcoming meetings in launcher",
+            .calendarCalendar, "Upcoming meetings in launcher",
             keywords: ["count", "limit", "events"]),
-        .init(
-            .calendarSchedule, "Include Tomorrow's Events",
-            keywords: ["next day", "range"]),
         .init(
             .calendarJoining, "Show the join card",
             keywords: ["hud", "timing", "early", "reminder"]),
@@ -466,20 +541,32 @@ enum SettingsSearchCatalog {
             .calendarJoining, "Auto Join Meetings",
             keywords: ["automatic", "start"]),
         .init(
+            .calendarJoining, "Only join known meeting services",
+            keywords: ["zoom", "meet", "teams", "links", "placeholder", "skip"]),
+        .init(
             .calendarJoining, "Confirm before joining",
             keywords: ["ask", "prompt"]),
         .init(
             .calendarJoining, "Camera Preview",
             keywords: ["webcam", "mirror", "video", "check"]),
         .init(
+            .calendarJoining, "Open Meeting Links In",
+            keywords: ["browser", "chrome", "safari", "firefox", "meet", "web"]),
+        .init(
             .calendarMenuBar, "Calendar in Menu Bar",
             keywords: ["status item", "menubar", "date"]),
+        .init(
+            .calendarMenuBar, "Days to Show",
+            keywords: ["tomorrow", "week", "next 7 days", "range", "agenda", "schedule"]),
         .init(
             .calendarMenuBar, "Show Upcoming Events",
             keywords: ["menubar", "next event", "title"]),
         .init(
             .calendarMenuBar, "Only show events with meetings",
             keywords: ["links", "filter", "menubar"]),
+        .init(
+            .calendarMenuBar, "Hide when there are no upcoming events",
+            keywords: ["empty", "idle", "menubar", "space"]),
         .init(
             .calendarMenuBar, "Hide Current Event",
             keywords: ["started", "time left", "menubar"]),
@@ -499,23 +586,25 @@ enum SettingsSearchCatalog {
             .extensionsExtensions, "Enable extensions",
             keywords: ["raycast", "third party", "javascript"]),
         .init(
-            group: .extensionsCompatibility, "Compatibility",
-            keywords: ["supported", "unsupported", "raycast api"]),
-        .init(
-            group: .extensionsInstalled, "Installed extensions",
-            keywords: ["library", "uninstall", "preferences", "appearance", "alias", "shortcut"]),
-        .init(
             .extensionsInstall, "Search extensions",
-            keywords: ["store", "browse", "install", "registry"]),
+            keywords: ["store", "browse", "install"]),
         .init(
-            group: .extensionsInstall, "Registries",
-            keywords: ["github", "source", "store"]),
+            .extensionsInstall, "Install from GitHub",
+            keywords: ["source", "build", "repository", "package manager", "pnpm", "npm", "yarn", "bun"]),
         .init(
             .extensionsInstall, "Import from Raycast",
             keywords: ["migrate", "existing"]),
         .init(
             .extensionsInstall, "Add from folder",
             keywords: ["local", "develop", "sideload"]),
+        .init(
+            group: .extensionsInstalled, "Installed extensions",
+            keywords: [
+                "library", "uninstall", "update", "preferences", "appearance", "alias", "shortcut"
+            ]),
+        .init(
+            group: .extensionsCompatibility, "Compatibility",
+            keywords: ["supported", "unsupported", "raycast api"]),
         .init(
             .extensionsStorage, "Leftover files",
             keywords: ["clean up", "disk", "reclaim", "cache"])
@@ -530,7 +619,10 @@ enum SettingsSearchCatalog {
             keywords: ["paste", "keystrokes", "privacy", "grant"]),
         .init(
             .permissionsCalendars, "Calendars",
-            keywords: ["events", "privacy", "grant", "eventkit"])
+            keywords: ["events", "privacy", "grant", "eventkit"]),
+        .init(
+            .permissionsMicrophone, "Microphone",
+            keywords: ["dictation", "recording", "privacy", "grant"])
     ]
 
     private static let backup: [SettingsSearchEntry] = [
@@ -545,7 +637,10 @@ enum SettingsSearchCatalog {
             keywords: ["restore", "choose", "tinycast file"]),
         .init(
             .backupImportFromRaycast, "Raycast Export",
-            keywords: ["migrate", "rayconfig", "passphrase"])
+            keywords: ["migrate", "rayconfig", "passphrase"]),
+        .init(
+            .backupSettingsFile, "Sync settings file",
+            keywords: ["settings.json", "config", "json", "dotfiles", ".config", "edit"])
     ]
 
     private static let about: [SettingsSearchEntry] = [

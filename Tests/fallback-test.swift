@@ -1,5 +1,3 @@
-// The fallback list's pure half: identity, stored order, and the section header's elision.
-
 import Foundation
 
 @main
@@ -61,7 +59,7 @@ struct FallbackTests {
     // MARK: - Ordering
 
     static func ordering() {
-        let ai = Fallback.builtin(.aiChat)
+        let ai = Fallback.builtin(.quickAI)
         let files = Fallback.builtin(.searchFiles)
         let shell = Fallback.builtin(.runShellCommand)
         let link = Fallback.quicklink(UUID())

@@ -1,10 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// The editor's left column: one display drawn to scale, its entries over it, and the tabs.
 struct WindowLayoutPreview: View {
     let draft: WindowLayoutDraft
-    /// Resolved once by the sheet: an AX read per render would cost a round trip per keystroke.
+    /// Resolved once by the panel: an AX read per render would cost a round trip per keystroke.
     let screens: [WindowLayoutScreen]
     let gap: CGFloat
 
@@ -48,7 +47,6 @@ struct WindowLayoutPreview: View {
     }
 }
 
-/// One display to scale with a rounded rect per entry on it. Draws; decides nothing.
 struct WindowLayoutPreviewCanvas: View {
     let draft: WindowLayoutDraft
     let screen: WindowLayoutScreen?

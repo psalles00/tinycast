@@ -54,16 +54,21 @@ struct AIStreamDecoder: Sendable {
         var id = ""
         var name = ""
         var arguments = ""
+        var thoughtSignature: String?
     }
 
     private let shape: AIHTTPConfiguration.APIShape
+    /// What a provider's own error text must never show; the decoder is handed it, never reads it.
+    private let secrets: [String]
     private var parser = SSEParser()
+    private var thinkTags = AIThinkTagDecoder()
     private var usage = AIUsage()
     private var partialToolCalls: [Int: PartialToolCall] = [:]
     private(set) var isTerminal = false
 
-    init(shape: AIHTTPConfiguration.APIShape) {
+    init(shape: AIHTTPConfiguration.APIShape, secrets: [String] = []) {
         self.shape = shape
+        self.secrets = secrets
     }
 
     /// Assembled in index order, so a turn's calls reach the loop as the model listed them.
@@ -74,7 +79,9 @@ struct AIStreamDecoder: Sendable {
         return calls.compactMap { call in
             guard !call.name.isEmpty else { return nil }
             return .toolCallRequested(
-                AIToolCall(id: call.id, name: call.name, arguments: call.arguments))
+                AIToolCall(
+                    id: call.id, name: call.name, arguments: call.arguments,
+                    thoughtSignature: call.thoughtSignature))
         }
     }
 
@@ -83,7 +90,9 @@ struct AIStreamDecoder: Sendable {
     }
 
     mutating func finish() throws -> [AIStreamEvent] {
-        try decode(parser.finish())
+        var events = try decode(parser.finish())
+        if shape == .openAICompatible, !isTerminal { events += thinkTags.finish() }
+        return events
     }
 
     private mutating func decode(_ payloads: [String]) throws -> [AIStreamEvent] {
@@ -91,6 +100,7 @@ struct AIStreamDecoder: Sendable {
         for payload in payloads where !isTerminal {
             if payload == "[DONE]" {
                 isTerminal = true
+                if shape == .openAICompatible { events += thinkTags.finish() }
                 events.append(contentsOf: flushToolCalls())
                 events.append(.finished)
                 continue
@@ -114,16 +124,18 @@ struct AIStreamDecoder: Sendable {
         }
 
         // OpenRouter reports a mid-stream failure as a 200 payload, so it's an event, not a status.
-        if let message = chunk.error?.message {
+        if chunk.error?.message != nil {
             isTerminal = true
-            throw AIProviderError.responseFailed(message)
+            throw AIProviderError.responseFailed(
+                AIProviderFailure.providerMessage(in: data)
+                    .map { AIProviderFailure.kept($0, secrets: secrets) } ?? Self.stopped)
         }
         var events: [AIStreamEvent] = []
         if let choice = chunk.choices?.first {
             if let content = choice.delta?.content, !content.isEmpty {
-                events.append(.text(content))
-            } else if choice.delta?.hasReasoning == true {
-                events.append(.thinking)
+                events += thinkTags.feed(content)
+            } else if let reasoning = choice.delta?.reasoningText {
+                events += [.thinking, .reasoning(reasoning)]
             }
             for fragment in choice.delta?.toolCalls ?? [] { absorb(fragment) }
             if choice.finishReason == "tool_calls" { events.append(contentsOf: flushToolCalls()) }
@@ -131,6 +143,9 @@ struct AIStreamDecoder: Sendable {
         if let reported = chunk.usage {
             usage.inputTokens = reported.promptTokens ?? usage.inputTokens
             usage.outputTokens = reported.completionTokens ?? usage.outputTokens
+            usage.reasoningTokens =
+                reported.completionTokensDetails?.reasoningTokens ?? usage.reasoningTokens
+            usage.costUSD = reported.cost ?? usage.costUSD
             events.append(.usage(usage))
         }
         return events
@@ -142,6 +157,9 @@ struct AIStreamDecoder: Sendable {
         if let id = fragment.id, !id.isEmpty { partial.id = id }
         if let name = fragment.function?.name, !name.isEmpty { partial.name = name }
         partial.arguments += fragment.function?.arguments ?? ""
+        if let signature = fragment.extraContent?.google?.thoughtSignature {
+            partial.thoughtSignature = signature
+        }
         partialToolCalls[fragment.index ?? 0] = partial
     }
 
@@ -168,9 +186,15 @@ struct AIStreamDecoder: Sendable {
                 partialToolCalls[event.index ?? 0]?.arguments += event.delta?.partialJSON ?? ""
                 return []
             }
-            return event.delta?.type == "thinking_delta" ? [.thinking] : []
+            guard event.delta?.type == "thinking_delta" else { return [] }
+            guard let thinking = event.delta?.thinking, !thinking.isEmpty else { return [.thinking] }
+            return [.thinking, .reasoning(thinking)]
         case "message_start":
-            usage.inputTokens = event.message?.usage?.inputTokens ?? usage.inputTokens
+            let reported = event.message?.usage
+            usage.inputTokens = reported?.inputTokens ?? usage.inputTokens
+            let cached = [reported?.cacheReadInputTokens, reported?.cacheCreationInputTokens]
+                .compactMap { $0 }
+            if !cached.isEmpty { usage.cachedInputTokens = cached.reduce(0, +) }
             return [.usage(usage)]
         case "message_delta":
             usage.outputTokens = event.usage?.outputTokens ?? usage.outputTokens
@@ -182,17 +206,22 @@ struct AIStreamDecoder: Sendable {
             return flushToolCalls() + [.finished]
         case "error":
             isTerminal = true
-            throw AIProviderError.responseFailed(Self.anthropicErrorMessage(event.error?.type))
+            throw AIProviderError.responseFailed(
+                AIProviderFailure.described(
+                    Self.anthropicErrorMessage(event.error?.type), said: event.error?.message,
+                    secrets: secrets))
         default:
             return []
         }
     }
 
+    private static let stopped = "The provider stopped the response with an error."
+
     private static func anthropicErrorMessage(_ type: String?) -> String {
         switch type {
         case "authentication_error": return "API key rejected — check it in Settings."
         case "rate_limit_error": return "Rate limit reached — try again later."
-        default: return "The provider stopped the response with an error."
+        default: return stopped
         }
     }
 }
@@ -208,23 +237,46 @@ private struct OpenAIChunk: Decodable {
                     let arguments: String?
                 }
 
+                struct ExtraContent: Decodable {
+                    struct Google: Decodable {
+                        let thoughtSignature: String?
+
+                        enum CodingKeys: String, CodingKey {
+                            case thoughtSignature = "thought_signature"
+                        }
+                    }
+
+                    let google: Google?
+                }
+
                 let index: Int?
                 let id: String?
                 let function: Function?
+                let extraContent: ExtraContent?
+
+                enum CodingKeys: String, CodingKey {
+                    case index, id, function
+                    case extraContent = "extra_content"
+                }
             }
 
             let content: String?
             let reasoning: String?
+            let reasoningContent: String?
             let reasoningDetails: [ReasoningDetail]?
             let toolCalls: [ToolCall]?
 
-            var hasReasoning: Bool {
-                reasoning?.isEmpty == false
-                    || reasoningDetails?.contains(where: { $0.text?.isEmpty == false }) == true
+            /// OpenRouter says `reasoning`, DeepSeek and its copies `reasoning_content`.
+            var reasoningText: String? {
+                let text =
+                    [reasoning, reasoningContent].compactMap { $0 }.first { !$0.isEmpty }
+                    ?? reasoningDetails?.compactMap(\.text).joined()
+                return text?.isEmpty == false ? text : nil
             }
 
             enum CodingKeys: String, CodingKey {
                 case content, reasoning
+                case reasoningContent = "reasoning_content"
                 case reasoningDetails = "reasoning_details"
                 case toolCalls = "tool_calls"
             }
@@ -240,12 +292,25 @@ private struct OpenAIChunk: Decodable {
     }
 
     struct Usage: Decodable {
+        struct CompletionDetails: Decodable {
+            let reasoningTokens: Int?
+
+            enum CodingKeys: String, CodingKey {
+                case reasoningTokens = "reasoning_tokens"
+            }
+        }
+
         let promptTokens: Int?
         let completionTokens: Int?
+        let completionTokensDetails: CompletionDetails?
+        /// OpenRouter's own figure; a vendor API sends none.
+        let cost: Double?
 
         enum CodingKeys: String, CodingKey {
             case promptTokens = "prompt_tokens"
             case completionTokens = "completion_tokens"
+            case completionTokensDetails = "completion_tokens_details"
+            case cost
         }
     }
 
@@ -260,11 +325,12 @@ private struct AnthropicEvent: Decodable {
     struct Delta: Decodable {
         let type: String?
         let text: String?
+        let thinking: String?
         let partialJSON: String?
         let stopReason: String?
 
         enum CodingKeys: String, CodingKey {
-            case type, text
+            case type, text, thinking
             case partialJSON = "partial_json"
             case stopReason = "stop_reason"
         }
@@ -279,15 +345,22 @@ private struct AnthropicEvent: Decodable {
     struct Usage: Decodable {
         let inputTokens: Int?
         let outputTokens: Int?
+        let cacheReadInputTokens: Int?
+        let cacheCreationInputTokens: Int?
 
         enum CodingKeys: String, CodingKey {
             case inputTokens = "input_tokens"
             case outputTokens = "output_tokens"
+            case cacheReadInputTokens = "cache_read_input_tokens"
+            case cacheCreationInputTokens = "cache_creation_input_tokens"
         }
     }
 
     struct Message: Decodable { let usage: Usage? }
-    struct ErrorBody: Decodable { let type: String? }
+    struct ErrorBody: Decodable {
+        let type: String?
+        let message: String?
+    }
 
     let type: String
     let index: Int?

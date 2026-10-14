@@ -1,7 +1,6 @@
 import AppKit
 import SwiftUI
 
-/// The Search Quicklinks screen: the whole library, pinned entries first.
 struct QuicklinkList: View {
     @Environment(\.metrics) private var metrics
     let results: [Quicklink]
@@ -99,10 +98,11 @@ private struct QuicklinkRow: View {
     }
 
     var body: some View {
-        HStack(spacing: metrics.spacing.lg) {
+        IconCache.observeStyle()
+        return HStack(spacing: metrics.spacing.lg) {
             Image(nsImage: IconCache.symbolIcon(named: quicklink.symbol))
                 .resizable()
-                .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
+                .frame(width: metrics.size.resultRowIcon, height: metrics.size.resultRowIcon)
             VStack(alignment: .leading, spacing: metrics.spacing.xxs) {
                 Text(quicklink.name)
                     .font(metrics.typography.rowTitle)
@@ -137,7 +137,6 @@ private struct QuicklinkRow: View {
     }
 }
 
-/// The detail pane beside the list, the way Search Snippets previews the snippet it highlights.
 struct QuicklinkPreview: View {
     @Environment(\.metrics) private var metrics
     let quicklink: Quicklink?
@@ -172,8 +171,18 @@ private struct QuicklinkInfoSection: View {
 
     private struct InfoRow: Identifiable {
         let label: String
-        let value: String
+        let value: Text
         var id: String { label }
+
+        init(label: String, value: String) {
+            self.label = label
+            self.value = Text(value)
+        }
+
+        init(label: String, keycaps: [String]) {
+            self.label = label
+            value = KeyCapChip.inlineText(keycaps)
+        }
     }
 
     /// Relative day plus exact time; shared, `DateFormatter` being expensive to build.
@@ -197,7 +206,7 @@ private struct QuicklinkInfoSection: View {
                     value: AppPresentation.resolve(bundleID: bundleID, in: appIndex).name))
         }
         if let keycaps = hotKeys.binding(for: .quicklink(id: quicklink.id))?.keycaps {
-            rows.append(InfoRow(label: "Shortcut", value: keycaps.joined()))
+            rows.append(InfoRow(label: "Shortcut", keycaps: keycaps))
         }
         rows.append(
             InfoRow(label: "Created", value: Self.createdFormatter.string(from: quicklink.createdAt)))
@@ -216,7 +225,7 @@ private struct QuicklinkInfoSection: View {
                     HStack(spacing: metrics.spacing.sm) {
                         Text(row.label).foregroundStyle(.secondary)
                         Spacer(minLength: metrics.spacing.lg)
-                        Text(row.value).lineLimit(1).truncationMode(.middle)
+                        row.value.lineLimit(1).truncationMode(.middle)
                     }
                     .font(metrics.typography.keyCap)
                     .padding(.vertical, metrics.spacing.xs)

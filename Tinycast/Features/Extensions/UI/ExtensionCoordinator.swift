@@ -71,6 +71,13 @@ final class ExtensionCoordinator {
         guard settings.extensionsEnabled,
             let entry = extensions.launcherEntry(forEntryID: entryID)
         else { return }
+        // The shortcut's second press closes its command, as a mode command's does.
+        if paletteCoordinator.isShowing(.extensionCommand),
+            extensions.running == ExtensionCommandRef(entryID: entryID)
+        {
+            paletteCoordinator.hidePalette()
+            return
+        }
         runExtensionCommand(entry)
     }
 
@@ -84,11 +91,6 @@ final class ExtensionCoordinator {
             core.showMessage("No installed extension provides '\(link.commandName)'", tone: .danger)
             return
         }
-        guard command.mode.isSupported else {
-            core.showMessage(
-                command.mode.unsupportedReason ?? "This command isn't supported yet", tone: .danger)
-            return
-        }
         run(
             owner, command: command, arguments: link.arguments, fallbackText: link.fallbackText,
             launchType: link.launchType)
@@ -96,7 +98,15 @@ final class ExtensionCoordinator {
 
     // MARK: - Managing one extension from the launcher
 
-    /// Opens Settings on the extension a launcher row belongs to.
+    func showStoreInstall(_ install: ExtensionDeepLink.StoreInstall) {
+        paletteCoordinator.hidePalette(restoreFocus: false)
+        if settings.extensionsEnabled { core.pendingExtensionStoreInstall = install }
+        settingsCoordinator.showSettings(tab: .extensions)
+        if !settings.extensionsEnabled {
+            core.showMessage("Extensions are disabled — enable them in Settings", tone: .danger)
+        }
+    }
+
     func showExtensionSettings(for app: AppEntry) {
         guard let (owner, _) = extensions.resolve(app) else { return }
         showExtensionSettings(for: owner)
@@ -161,14 +171,21 @@ final class ExtensionCoordinator {
     }
 
     /// A view command takes over the palette; a no-view command closes it and runs headless.
-    func runExtensionCommand(_ app: AppEntry, arguments: [String: String] = [:]) {
+    func runExtensionCommand(
+        _ app: AppEntry, arguments: [String: String] = [:], fallbackText: String? = nil,
+        launchType: ExtensionLaunchType = .userInitiated,
+        launchContext: [String: RenderValue] = [:]
+    ) {
         guard let (owner, command) = extensions.resolve(app) else { return }
-        run(owner, command: command, arguments: arguments)
+        run(
+            owner, command: command, arguments: arguments, fallbackText: fallbackText,
+            launchType: launchType, launchContext: launchContext)
     }
 
     private func run(
         _ owner: InstalledExtension, command: ExtensionCommand, arguments: [String: String],
-        fallbackText: String? = nil, launchType: ExtensionLaunchType = .userInitiated
+        fallbackText: String? = nil, launchType: ExtensionLaunchType = .userInitiated,
+        launchContext: [String: RenderValue] = [:]
     ) {
         switch command.mode {
         case .view:
@@ -178,18 +195,26 @@ final class ExtensionCoordinator {
             if !paletteCoordinator.isVisible {
                 paletteCoordinator.showPalette(mode: .extensionCommand)
             }
+            if let fallbackText, !fallbackText.isEmpty { palette.query = fallbackText }
         case .noView, .menuBar:
             // A no-view command's own HUD is the feedback, so the palette gets out of the way.
-            paletteCoordinator.hidePalette(restoreFocus: false)
+            if launchType == .userInitiated { paletteCoordinator.hidePalette(restoreFocus: false) }
         }
         Task {
             await extensions.run(
                 owner, command: command, arguments: arguments, fallbackText: fallbackText,
-                launchType: launchType)
+                launchType: launchType, launchContext: launchContext)
         }
     }
 
-    /// The arguments a row declares, or nil — what decides whether the header shows inline fields.
+    func menuBarIsEnabled(_ reference: ExtensionCommandRef) -> Bool {
+        extensions.menuBarIsEnabled(reference)
+    }
+
+    func setMenuBarEnabled(_ enabled: Bool, reference: ExtensionCommandRef) {
+        extensions.setMenuBarEnabled(enabled, reference: reference)
+    }
+
     func commandArguments(for entry: AppEntry?) -> [ExtensionCommandArgument]? {
         guard let entry, entry.kind == .extensionCommand,
             let (_, command) = extensions.resolve(entry), !command.arguments.isEmpty
@@ -216,9 +241,8 @@ final class ExtensionCoordinator {
 
     func showExtensionSettings(for owner: InstalledExtension) {
         paletteCoordinator.hidePalette(restoreFocus: false)
-        settingsCoordinator.showSettings(tab: .extensions)
-        NotificationCenter.default.post(
-            name: .tinycastSelectExtension, object: owner.manifest.name)
+        settingsCoordinator.showSettings(
+            tab: .extensions, revealing: .row(.extensionsInstalled, owner.manifest.name))
     }
 
     // MARK: - Host callbacks, routed here so the manager never touches a window itself
@@ -232,9 +256,6 @@ final class ExtensionCoordinator {
     /// True while the palette is on screen — a toast has somewhere to render only then.
     var isPaletteVisible: Bool { paletteCoordinator.isVisible }
 
-    /// True while an OAuth authorization flow is actively awaiting callback.
-    var isAuthorizing: Bool { extensions.isAuthorizing }
-
     func closeMainWindow() {
         paletteCoordinator.hidePalette(restoreFocus: false)
     }
@@ -246,6 +267,17 @@ final class ExtensionCoordinator {
 
     func clearSearchBar() {
         palette.query = ""
+    }
+
+    var extensionSearch: ExtensionSearchState.Screen? {
+        guard palette.mode == .extensionCommand else { return nil }
+        return ExtensionSearchState.Screen(query: palette.query, selection: palette.selection)
+    }
+
+    func showExtensionSearch(_ search: ExtensionSearchState.Screen, tree: RenderTree) {
+        let count = ExtensionScreen(tree: tree, query: search.query).items.count
+        palette.query = search.query
+        palette.selection = min(max(search.selection, 0), max(count - 1, 0))
     }
 
     /// Its own window: a no-view command closes the palette before the pill is done.
@@ -264,9 +296,4 @@ final class ExtensionCoordinator {
             confirmRole: alert.isDestructive ? .destructive : .standard,
             dismissTitle: alert.dismissTitle)
     }
-}
-
-extension Notification.Name {
-    /// Carries an extension's name so the Settings pane can select it once shown.
-    static let tinycastSelectExtension = Notification.Name("tinycastSelectExtension")
 }

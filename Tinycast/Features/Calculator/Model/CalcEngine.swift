@@ -1,6 +1,5 @@
 import Foundation
 
-/// A single evaluated calculator answer for the launcher's inline card.
 struct CalcResult: Equatable, Sendable {
     enum Payload: Equatable, Sendable {
         /// `display` is grouped ("1,234,567"); `copyText` is the same answer, ungrouped.
@@ -12,6 +11,15 @@ struct CalcResult: Equatable, Sendable {
             let text = CalcFormatter.copyText(value)
             return .value(display: CalcFormatter.grouped(text) + suffix, copyText: text + suffix)
         }
+
+        /// CSS lengths copy unspaced ("24px") so the answer pastes straight into a stylesheet.
+        static func measurement(_ value: Double, unit: UnitDef) -> Self {
+            let text = CalcFormatter.copyText(value)
+            let copySeparator = unit.category == .pixels ? "" : " "
+            return .value(
+                display: "\(CalcFormatter.grouped(text)) \(unit.symbol)",
+                copyText: text + copySeparator + unit.symbol)
+        }
     }
 
     /// Normalized echo of what was evaluated, shown on the card's left side ("3×3", "10 km").
@@ -20,12 +28,18 @@ struct CalcResult: Equatable, Sendable {
     let sourceBadge: String?
     let targetBadge: String?
     let payload: Payload
+    /// False when the copy text, typed back as a query, is not this answer: dates, times, booleans.
+    let canChain: Bool
 
-    init(expression: String, sourceBadge: String? = nil, targetBadge: String? = nil, payload: Payload) {
+    init(
+        expression: String, sourceBadge: String? = nil, targetBadge: String? = nil, payload: Payload,
+        canChain: Bool = true
+    ) {
         self.expression = expression
         self.sourceBadge = sourceBadge
         self.targetBadge = targetBadge
         self.payload = payload
+        self.canChain = canChain
     }
 
     /// True only for a copyable value; an error card has no primary action and no actions menu.
@@ -35,23 +49,28 @@ struct CalcResult: Equatable, Sendable {
     }
 }
 
-/// Raw query to answer, or nil when it isn't calculator input. See docs/features/calculator.md.
 enum CalcEngine {
-    /// `now`/`calendar`/`region` are injected so every path is deterministic under the harness.
+    /// Every environment fact is injected; the answer is canonical, for `format` to localize.
     static func evaluate(
         _ raw: String, now: Date, calendar: Calendar, rates: CurrencyRates? = nil,
-        region: String? = nil
+        region: String? = nil, format: CalcNumberFormat = .english
     ) -> CalcResult? {
-        let query = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty, query.count <= 256 else { return nil }
-        guard !query.utf8.allSatisfy({ (65...90).contains($0) || (97...122).contains($0) }) else {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= 256, let query = format.canonical(trimmed) else {
             return nil
         }
+        if query.utf8.allSatisfy({ (65...90).contains($0) || (97...122).contains($0) }) {
+            return CalcDateTime.namedMoment(query, now: now, calendar: calendar).map(unchained)
+        }
 
-        if let dateTime = CalcDateTime.evaluate(query, now: now, calendar: calendar) { return dateTime }
+        if let dateTime = CalcDateTime.evaluate(query, now: now, calendar: calendar) {
+            return unchained(dateTime)
+        }
 
         // Before tokenizing: `5pm ldn in sf` is words, which the tokenizer would reject.
-        if let zone = CalcTimeZone.evaluate(query, now: now, calendar: calendar) { return zone }
+        if let zone = CalcTimeZone.evaluate(query, now: now, calendar: calendar) {
+            return unchained(zone)
+        }
 
         guard let tokens = CalcTokenizer.tokenize(query), !tokens.isEmpty else { return nil }
 
@@ -94,7 +113,7 @@ enum CalcEngine {
                     expression: "\(CalcFormatter.display(input)) \(from.symbol)",
                     sourceBadge: from.name,
                     targetBadge: to.name,
-                    payload: .number(output, suffix: " \(to.symbol)"))
+                    payload: .measurement(output, unit: to))
             case .mismatch(let from, let to):
                 return CalcResult(
                     expression: query,
@@ -132,14 +151,13 @@ enum CalcEngine {
             }
         }
 
-        // Keyword-less conversion: `1m` → feet+inches, `1hr` → 60 min.
         if let bare = CalcUnits.parseBareConversion(tokens) {
             let payload: CalcResult.Payload
             if bare.compound {
                 let text = CalcFormatter.compoundFeetInches(bare.output)
                 payload = .value(display: text, copyText: text)
             } else {
-                payload = .number(bare.output, suffix: " \(bare.to.symbol)")
+                payload = .measurement(bare.output, unit: bare.to)
             }
             return CalcResult(
                 expression: "\(CalcFormatter.display(bare.input)) \(bare.from.symbol)",
@@ -148,7 +166,6 @@ enum CalcEngine {
                 payload: payload)
         }
 
-        // Natural-language percent: `20% off 500`, `50 as % of 200`.
         if let percent = CalcPercent.evaluate(tokens, query: query) { return percent }
 
         return nil
@@ -204,7 +221,6 @@ enum CalcEngine {
         }
     }
 
-    /// Rebuilds a token stream into equivalent calculator input for evaluating its complete prefix.
     private static func tokenQuery(_ tokens: [CalcToken]) -> String {
         tokens.map { token in
             switch token {
@@ -231,7 +247,17 @@ enum CalcEngine {
             expression: expression,
             sourceBadge: result.sourceBadge,
             targetBadge: result.targetBadge,
-            payload: result.payload)
+            payload: result.payload,
+            canChain: result.canChain)
+    }
+
+    private static func unchained(_ result: CalcResult) -> CalcResult {
+        CalcResult(
+            expression: result.expression,
+            sourceBadge: result.sourceBadge,
+            targetBadge: result.targetBadge,
+            payload: result.payload,
+            canChain: false)
     }
 
     // MARK: - Number bases

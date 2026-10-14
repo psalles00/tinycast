@@ -1,6 +1,5 @@
 #!/bin/bash
 # Lint the whole project. `--fix` auto-corrects the mechanical subset first.
-# Formatting is a separate tool with its own caveats — see ./Scripts/format.sh.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
@@ -11,14 +10,12 @@ command -v swiftlint >/dev/null || {
 
 [ "${1:-}" = "--fix" ] && swiftlint --fix --quiet
 
-# CI sets SWIFTLINT_REPORTER=github-actions-logging so violations land inline on the PR diff.
-if ! swiftlint lint --quiet ${SWIFTLINT_REPORTER:+--reporter "$SWIFTLINT_REPORTER"}; then
+if ! swiftlint lint --quiet; then
     echo
     echo "Lint errors above. Warnings do not block; errors do." >&2
     exit 1
 fi
-# A `Form` can't be asked what it holds, so an unclaimed anchor or an unmarked row is a silent
-# no-op: the search result navigates and then nothing scrolls or lights up. Nothing else catches it.
+# An unclaimed settings anchor or unmarked row fails silently, and nothing else catches it.
 if ! node Scripts/check-settings-search.js; then
     exit 1
 fi

@@ -59,6 +59,7 @@ struct AboutView: View {
                 Text(Self.version)
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
                     .padding(.horizontal, Theme.Spacing.md)
                     .padding(.vertical, Theme.Spacing.xs / 2)
                     .background(
@@ -128,7 +129,6 @@ struct AboutView: View {
     }
 }
 
-/// One external destination in the About "Links" card.
 private struct AboutLink: Identifiable {
     enum Glyph {
         case symbol(String)
@@ -145,8 +145,8 @@ private struct AboutLink: Identifiable {
     static let all: [AboutLink] = [
         AboutLink(
             id: "website", glyph: .symbol("globe"), title: "Website",
-            detail: "abue-ammar.github.io/tinycast",
-            url: URL(string: "https://abue-ammar.github.io/tinycast/")!),
+            detail: "tinycast.dev",
+            url: URL(string: "https://tinycast.dev/")!),
         AboutLink(
             id: "github", glyph: .brand("BrandGitHub"), title: "GitHub",
             detail: "github.com/abue-ammar/tinycast",
@@ -164,7 +164,6 @@ private struct AboutLink: Identifiable {
     ]
 }
 
-/// A row in the About "Links" card: glyph, title, destination and the arrow.
 private struct AboutLinkRow: View {
     let link: AboutLink
 

@@ -43,16 +43,16 @@ final class WindowLayoutCoordinator {
     func applyWindowLayoutsPresence() {
         let visible = settings.windowManagementEnabled && settings.windowLayoutsShowInLauncher
         appIndex.setWindowLayouts(visible ? store.layouts : [])
-        appIndex.setCommandsVisible([.createWindowLayout, .captureWindowLayout], visible)
+        let commands: Set<CommandID> = [.createWindowLayout, .captureWindowLayout]
+        appIndex.setCommandsVisible(commands, settings.windowManagementEnabled)
+        appIndex.setCommandsListed(commands, settings.windowLayoutsShowInLauncher)
     }
 
     // MARK: - Running
 
-    /// The one funnel for a palette row, a global shortcut and the pane's Apply alike.
     func runWindowLayout(id: UUID) {
         guard settings.windowManagementEnabled, let layout = store.layout(id: id) else { return }
-        // Never restoreFocus: a layout activates the apps it places, and handing focus back
-        // first pulls a different app forward mid-pass.
+        // Never restoreFocus: an opened app activates itself, and handing focus back races that.
         if paletteCoordinator.isVisible { paletteCoordinator.hidePalette(restoreFocus: false) }
         let gap = CGFloat(settings.windowGap)
         run?.cancel()
@@ -115,7 +115,7 @@ final class WindowLayoutCoordinator {
 
     /// Capture never saves silently: the draft lands in the editor so it can be seen and named.
     func captureWindowLayout() {
-        let entries = WindowLayoutRunner.captureCurrentWindows()
+        let (entries, frontmostEntryID) = WindowLayoutRunner.captureCurrentWindows()
         guard !entries.isEmpty else {
             core.showMessage("No windows to capture", tone: .neutral)
             return
@@ -123,7 +123,7 @@ final class WindowLayoutCoordinator {
         // Gapless by construction, so a later change to `windowGap` can't move every window.
         let draft = WindowLayout(
             name: Self.uniqueCaptureName(among: store.layouts), usesPreferredGap: false,
-            entries: entries)
+            entries: entries, frontmostEntryID: frontmostEntryID)
         core.pendingWindowLayoutEdit = WindowLayoutEditRequest(layout: draft, isCapture: true)
         settingsCoordinator.showSettings(tab: .windowManagement)
     }
@@ -150,7 +150,6 @@ final class WindowLayoutCoordinator {
         core.showMessage("\(layout.name) — \(detail)", tone: .neutral)
     }
 
-    /// What went wrong, or nil when everything the layout asked for happened.
     private func detail(for outcome: WindowLayoutRunner.Outcome) -> String? {
         var parts: [String] = []
         if let skipped = WindowLayoutPlan(placements: [], skipped: outcome.skipped).skippedSummary {

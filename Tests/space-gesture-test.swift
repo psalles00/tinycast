@@ -1,4 +1,3 @@
-// Standalone contract tests for the pure Space-switch gesture tables and IOHID payload bytes.
 import Foundation
 
 @main
@@ -80,6 +79,8 @@ struct SpaceGestureTests {
         expect(
             WindowCommand.ID.allCases.filter { SpaceDirection($0) != nil }.count == 2,
             "exactly two commands are space switches")
+        expect(SpaceDirection.next.reversed == .previous, "next reverses to previous")
+        expect(SpaceDirection.previous.reversed == .next, "previous reverses to next")
     }
 
     // MARK: - Fixed point

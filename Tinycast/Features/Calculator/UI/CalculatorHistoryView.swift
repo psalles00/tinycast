@@ -31,12 +31,10 @@ struct CalculatorHistoryList: View {
         }
     }
 
-    /// Scroll target for the current selection.
     private var selectedRowID: String? {
         calcSelected ? Self.calcRowID : selectedID?.uuidString
     }
 
-    /// Whether the selection sits on flat index 0: the calc card, else the first entry.
     private var firstRowSelected: Bool {
         calc != nil ? calcSelected : selectedID != nil && selectedID == results.first?.id
     }
@@ -106,9 +104,12 @@ struct CalculatorHistoryList: View {
 private struct CalcHistoryRow: View {
 
     @Environment(\.metrics) private var metrics
+    @Environment(AppCore.self) private var core
     let entry: CalcHistoryEntry
     let selected: Bool
     @State private var hovered = false
+
+    private var format: CalcNumberFormat { core.calcNumberFormat }
 
     private var fill: Color {
         if selected { return Theme.Colors.selection }
@@ -117,23 +118,17 @@ private struct CalcHistoryRow: View {
     }
 
     var body: some View {
-        HStack(spacing: metrics.spacing.lg) {
-            RoundedRectangle(cornerRadius: metrics.radius.thumbnail, style: .continuous)
-                .fill(Theme.Colors.controlSurface)
-                .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
-                .overlay(
-                    Image(systemName: "plus.forwardslash.minus")
-                        .font(.system(size: 12))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.secondary)
-                )
-            Text(entry.expression)
+        IconCache.observeStyle()
+        return HStack(spacing: metrics.spacing.lg) {
+            Image(nsImage: IconCache.symbolIcon(named: "plus.forwardslash.minus")).resizable()
+                .frame(width: metrics.size.resultRowIcon, height: metrics.size.resultRowIcon)
+            Text(format.localizedExpression(entry.expression))
                 .font(metrics.typography.rowTitle)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: metrics.spacing.xl)
-            Text(entry.result)
+            Text(format.localized(entry.result))
                 .font(metrics.typography.rowTitle.weight(.semibold))
                 .lineLimit(1)
         }

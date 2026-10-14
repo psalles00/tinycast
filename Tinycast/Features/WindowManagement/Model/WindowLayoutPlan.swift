@@ -34,7 +34,6 @@ struct WindowLayoutPlan: Equatable, Sendable {
         case duplicateTarget
     }
 
-    /// Where the window for a placement comes from.
     enum Source: Equatable, Sendable {
         case existing(handle: Int)
         /// Open it, then take the window that appears.
@@ -61,6 +60,8 @@ struct WindowLayoutPlan: Equatable, Sendable {
     /// In entry order, so a layout with two windows of one app always lands the same way.
     var placements: [Placement]
     var skipped: [Skipped]
+    /// The layout's frontmost entry, kept only when it produced a placement to bring forward.
+    var frontmostEntryID: UUID?
 
     /// One open per launching placement; the plan already guarantees they are distinct.
     var opens: [Placement] { placements.filter { $0.source == .launch } }
@@ -130,7 +131,9 @@ struct WindowLayoutPlan: Equatable, Sendable {
                     source: source, frame: frame, screenID: target.screen.id, anchor: entry.anchor,
                     canvas: WindowLayoutGeometry.box(target.screen, gap: gap)))
         }
-        return WindowLayoutPlan(placements: placements, skipped: skipped)
+        let frontmost = placements.first { $0.entryID == layout.frontmostEntryID }?.entryID
+        return WindowLayoutPlan(
+            placements: placements, skipped: skipped, frontmostEntryID: frontmost)
     }
 
     /// Nearest centre wins, so an already-correct desktop is a no-op and nothing swaps displays.

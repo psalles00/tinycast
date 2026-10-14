@@ -12,8 +12,7 @@ struct MenuBarSummary: Sendable {
 
     /// Long enough to recognise a meeting, short enough to leave the menu bar usable.
     static let titleCap = 24
-    /// A midnight meeting is useful when it is about to start, but should not keep today's menu bar
-    /// occupied for hours.
+    /// A midnight meeting shows as it nears, but must not hold today's menu bar for hours.
     static let nextDayGrace: TimeInterval = 30 * 60
 
     init(
@@ -28,11 +27,13 @@ struct MenuBarSummary: Sendable {
         self.calendar = calendar
     }
 
-    /// The earliest event still inside its window, so one hiding hands the space to the next.
-    func event(from events: [MeetingEvent], now: Date) -> MeetingEvent? {
+    /// The earliest event inside its window and undismissed, so one hiding hands over the next.
+    func event(
+        from events: [MeetingEvent], now: Date, dismissed: Set<MeetingEvent.ID> = []
+    ) -> MeetingEvent? {
         UpcomingWindow.agenda(from: events, now: now).first {
-            (!linkedOnly || $0.link != nil) && isInsideLead(for: $0, now: now)
-                && now < hidesAt($0)
+            !dismissed.contains($0.id) && (!linkedOnly || $0.link != nil)
+                && isInsideLead(for: $0, now: now) && now < hidesAt($0)
         }
     }
 

@@ -1,6 +1,5 @@
 import Foundation
 
-/// Typed arithmetic for measurements and currencies.
 enum CalcQuantity {
     static func evaluate(
         _ tokens: [CalcToken], query: String, rates: CurrencyRates?, region: String? = nil,
@@ -33,7 +32,8 @@ enum CalcQuantity {
             let text = value.amount == 0 ? "false" : "true"
             return CalcResult(
                 expression: expressionText(split.expressionTokens), sourceBadge: "Expression",
-                targetBadge: "Boolean", payload: .value(display: text, copyText: text))
+                targetBadge: "Boolean", payload: .value(display: text, copyText: text),
+                canChain: false)
         }
 
         if parser.usedCurrency && !parser.usedCurrencyRate {
@@ -133,7 +133,7 @@ enum CalcQuantity {
         CalcResult(
             expression: expression,
             sourceBadge: "Expression", targetBadge: unit.name,
-            payload: .number(amount, suffix: " \(unit.symbol)"))
+            payload: .measurement(amount, unit: unit))
     }
 
     private static func currencyResult(

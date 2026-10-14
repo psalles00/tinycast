@@ -1,7 +1,6 @@
 import AVKit
 import SwiftUI
 
-/// The preview pane's stage for a referenced file: a poster frame, or a player for media.
 struct FilePreviewStage: View {
     @Environment(\.metrics) private var metrics
     let path: String
@@ -14,7 +13,7 @@ struct FilePreviewStage: View {
 
     @State private var probe: Probe?
 
-    private var url: URL { URL(fileURLWithPath: path) }
+    private var url: URL { URL(filePath: path, directoryHint: .inferFromPath) }
 
     var body: some View {
         stage.task(id: path) { probe = await Self.probe(path) }

@@ -13,6 +13,8 @@ struct ExtensionListView: View {
     let onActivate: (Int) -> Void
     let onActions: (Int) -> Void
 
+    private static let detailListWidth: CGFloat = 290
+
     var body: some View {
         Group {
             if screen.items.isEmpty {
@@ -20,7 +22,7 @@ struct ExtensionListView: View {
             } else if screen.showsDetail {
                 HStack(spacing: 0) {
                     rowList
-                        .frame(width: metrics.size.clipboardListWidth)
+                        .frame(width: metrics.scaled(Self.detailListWidth))
                     Rectangle().fill(Theme.Colors.separator).frame(width: 1)
                     detailPane
                 }
@@ -97,7 +99,6 @@ struct ExtensionListView: View {
         }
     }
 
-    /// Scroll id of the selected item, or nil when the selection is out of range.
     private var selectedRowID: String? {
         screen.items.indices.contains(selection) ? screen.items[selection].id : nil
     }
@@ -156,14 +157,14 @@ struct ExtensionListView: View {
         {
             ExtensionDetailBody(
                 markdown: detail.string("markdown"), metadata: detail.node("metadata"),
-                isLoading: detail.bool("isLoading") ?? false, assetsPath: assetsPath)
+                isLoading: detail.bool("isLoading") ?? false, assetsPath: assetsPath,
+                stacksMetadata: true)
         } else {
             Color.clear
         }
     }
 }
 
-/// One `List.Item`: icon, title, subtitle, then its accessories right-aligned.
 private struct ExtensionItemRow: View {
     @Environment(\.metrics) private var metrics
     @Environment(\.isDarkAppearance) private var isDark
@@ -183,12 +184,13 @@ private struct ExtensionItemRow: View {
         HStack(spacing: metrics.spacing.lg) {
             if let icon = node.props["icon"], icon != .null {
                 ExtensionIconView(
-                    resolved: ExtensionImage.resolve(icon, assetsPath: assetsPath, isDark: isDark))
+                    resolved: ExtensionImage.resolve(icon, assetsPath: assetsPath, isDark: isDark),
+                    size: metrics.size.resultRowIcon)
             }
             Text(node.string("title") ?? "")
                 .font(metrics.typography.rowTitle)
                 .lineLimit(1)
-                // A detail list is 290pt wide, and an accessory would otherwise win the squeeze.
+                // Outranks the Spacer, which would otherwise take half the title's room.
                 .layoutPriority(1)
             if !compact, let subtitle = node.string("subtitle"), !subtitle.isEmpty {
                 Text(subtitle)
@@ -199,7 +201,9 @@ private struct ExtensionItemRow: View {
             Spacer(minLength: metrics.spacing.sm)
             // Raycast draws the accessories it is given, and a quota row's signal is all in them.
             ExtensionAccessoriesView(
-                accessories: node.array("accessories"), assetsPath: assetsPath)
+                accessories: node.array("accessories"), assetsPath: assetsPath
+            )
+            .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.horizontal, metrics.spacing.md)
         .padding(.vertical, metrics.spacing.sm)
@@ -294,7 +298,6 @@ struct ExtensionAccessoriesView: View {
     }
 }
 
-/// One `Grid.Item`: content sized to the tile the `Grid`'s props ask for, title underneath.
 private struct ExtensionGridCell: View {
     @Environment(\.metrics) private var metrics
     @Environment(\.isDarkAppearance) private var isDark

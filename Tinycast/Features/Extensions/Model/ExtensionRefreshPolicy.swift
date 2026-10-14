@@ -1,10 +1,11 @@
 import Foundation
 
-/// Raycast's background refresh, reduced to decisions. No state, no clock reads: every moment arrives
-/// as a parameter, so the harness drives it.
+/// Pure: every moment arrives as a parameter, so the harness drives it.
 enum ExtensionRefreshPolicy {
     /// What a manifest may ask for; tighter would burn battery re-rendering a subtitle.
     static let minimumInterval: TimeInterval = 60
+    /// A menu-bar item redraws in place, so it may tick far faster than a launcher subtitle.
+    static let menuBarMinimumInterval: TimeInterval = 10
     /// A broken command backs off to at most this, so it can never pin the loop.
     static let maximumInterval: TimeInterval = 24 * 3600
     /// Due commands firing together run as one batch when they land inside this window.
@@ -12,8 +13,8 @@ enum ExtensionRefreshPolicy {
     /// Idle wakeups stay this rare; date math is cheap but a wakeup never is.
     static let idleHeartbeat: TimeInterval = 300
 
-    /// `"90s"`, `"1m"`, `"12h"`, `"1d"` → seconds, clamped to the floor. Anything else is no schedule.
-    static func parse(_ raw: String?) -> TimeInterval? {
+    /// `"90s"`, `"1m"`, `"12h"`, `"1d"` → seconds, clamped to the floor; anything else is nil.
+    static func parse(_ raw: String?, floor: TimeInterval = minimumInterval) -> TimeInterval? {
         guard let raw else { return nil }
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard text.count >= 2, let unit = text.last, let amount = Double(text.dropLast()),
@@ -27,10 +28,12 @@ enum ExtensionRefreshPolicy {
         case "d": multiplier = 86400
         default: return nil
         }
-        return max(amount * multiplier, minimumInterval)
+        let seconds = amount * multiplier
+        // A huge amount overflows to infinity, which would schedule a tick that never comes.
+        return seconds.isFinite ? max(seconds, floor) : nil
     }
 
-    /// Only `no-view` refreshes; a `menu-bar` interval parses but never schedules.
+    /// Menu-bar refreshes belong to their own scheduler.
     static func isSchedulable(mode: ExtensionCommandMode, interval: TimeInterval?) -> Bool {
         mode == .noView && interval != nil
     }
@@ -56,18 +59,25 @@ enum ExtensionRefreshPolicy {
                 + jitter(entryID: entryID, interval: interval))
     }
 
+    /// Why Refresh Now can't start; nil when it can. The runtime holds one command at a time.
+    static func refreshNowRefusal(
+        foregroundRunning: Bool, refreshingCommand: String?, command: String
+    ) -> String? {
+        if refreshingCommand == command { return "Already refreshing." }
+        guard foregroundRunning || refreshingCommand != nil else { return nil }
+        return "Another extension command is running. Try again when it finishes."
+    }
+
     /// A hung background run dies before its successor is due, or ticks pile up behind it.
     static func timeout(interval: TimeInterval) -> TimeInterval {
         min(max(interval, 15), 120)
     }
 
-    /// Launcher dot for a scheduled command: an active refresh, its dimmed twin when switched
-    /// off, or the last background error. Anything unschedulable shows nothing at all.
     static func indicator(
         schedulable: Bool, backgroundEnabled: Bool, lastError: String?
     ) -> ExtensionRefreshState? {
         guard schedulable else { return nil }
-        // Failures arrive with a JS stack; the row hashes and diffs this, so keep the headline only.
+        // Failures carry a JS stack; the row hashes and diffs this, so keep the headline only.
         if let lastError { return .failed(headline(lastError)) }
         return backgroundEnabled ? .active : .idle
     }
@@ -76,8 +86,7 @@ enum ExtensionRefreshPolicy {
         String(message.split(separator: "\n").first ?? "Background refresh failed.")
     }
 
-    /// `subtitle: null` clears back to the manifest; the stored override otherwise wins. A subtitle
-    /// restating the owning extension is dropped — the row already carries it on the right.
+    /// A subtitle restating the owning extension is dropped: the row already carries it.
     static func displaySubtitle(manifest: String?, override: String?, ownerTitle: String) -> String? {
         let resolved = (override ?? manifest)?.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let resolved, !resolved.isEmpty else { return nil }

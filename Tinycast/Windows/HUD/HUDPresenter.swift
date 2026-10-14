@@ -4,7 +4,6 @@ import SwiftUI
 /// What both HUDs agree on: one at a time, replace, fade, dwell, fade away.
 @MainActor
 final class HUDPresenter {
-    /// Where the panel sits above the bottom of the visible frame.
     enum Anchor {
         case edgeInset(CGFloat)
         case heightFraction(CGFloat)
@@ -23,8 +22,9 @@ final class HUDPresenter {
     }
 
     /// A nil `size` lets SwiftUI measure; progress has no dwell, so it waits to be replaced.
-    func show(_ view: some View, size: CGSize? = nil, dwells: Bool = true) {
-        let panel = panel ?? make()
+    func show(_ view: some View, size: CGSize? = nil, dwells: Bool = true, interactive: Bool = false) {
+        let panel = panel ?? make(acceptsMouseEvents: interactive)
+        panel.ignoresMouseEvents = !interactive
         let host = NSHostingView(rootView: view)
         // Never size from `host.frame` after attaching: AppKit resets it to the content rect.
         let content = size ?? host.fittingSize
@@ -65,8 +65,8 @@ final class HUDPresenter {
         }
     }
 
-    private func make() -> HUDPanel {
-        let panel = HUDPanel()
+    private func make(acceptsMouseEvents: Bool) -> HUDPanel {
+        let panel = HUDPanel(acceptsMouseEvents: acceptsMouseEvents)
         self.panel = panel
         return panel
     }

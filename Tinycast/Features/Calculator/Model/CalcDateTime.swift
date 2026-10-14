@@ -1,7 +1,6 @@
 import Foundation
 
 enum CalcDateTime {
-    /// Which occurrence of a bare, recurring date/time a phrase resolves to.
     private enum MomentBias { case future, past, nearest }
 
     static func evaluate(
@@ -56,6 +55,25 @@ enum CalcDateTime {
             return result
         }
         return nil
+    }
+
+    /// The only lone words that answer: each names one moment, where `monday` or `july` recurs.
+    static func namedMoment(_ word: String, now: Date, calendar: Calendar) -> CalcResult? {
+        let lowered = word.lowercased()
+        switch lowered {
+        case "now", "today", "tomorrow", "yesterday":
+            return bareMoment(lowered, echo: word, now: now, calendar: calendar)
+        case "time":
+            let clock = CalcDateFormatters.string(
+                from: now, calendar: calendar, zone: calendar.timeZone, template: "jmm")
+            return CalcResult(
+                expression: word,
+                sourceBadge: dateString(now, now: now, calendar: calendar),
+                targetBadge: CalcTimeZone.label(for: calendar.timeZone),
+                payload: .value(display: clock, copyText: clock))
+        default:
+            return nil
+        }
     }
 
     private struct Signals: OptionSet {
@@ -331,7 +349,7 @@ enum CalcDateTime {
         let seconds = base.date.timeIntervalSince(other.date)
         let payload: CalcResult.Payload
         if let unit = targetUnit {
-            payload = .number(seconds / unit.factor, suffix: " \(unit.symbol)")
+            payload = .measurement(seconds / unit.factor, unit: unit)
         } else if hasTime {
             let text = CalcFormatter.timespan(seconds)
             payload = .value(display: text, copyText: text)
@@ -551,21 +569,18 @@ enum CalcDateTime {
     private static func parsePair(
         _ a: String, _ b: String, now: Date, calendar: Calendar, bias: MomentBias
     ) -> Moment? {
-        // number + month  /  month + number  →  a day in that month
         if let month = monthByName[b], let day = ordinalDay(a) {
             return monthDayMoment(month: month, day: day, now: now, calendar: calendar, bias: bias)
         }
         if let month = monthByName[a], let day = ordinalDay(b) {
             return monthDayMoment(month: month, day: day, now: now, calendar: calendar, bias: bias)
         }
-        // clock + am/pm  →  a time today (or tomorrow if it has passed)
         if b == "am" || b == "pm", let (hour, minute) = parseClock(a) {
             guard (1...12).contains(hour) else { return nil }
             let adjusted = b == "pm" ? (hour % 12) + 12 : hour % 12
             return clockMoment(
                 hour: adjusted, minute: minute, now: now, calendar: calendar, bias: bias)
         }
-        // next / last  +  weekday or month
         if a == "next" || a == "last" {
             if let weekday = weekdayByName[b] {
                 return nextWeekday(
@@ -782,8 +797,9 @@ enum CalcDateTime {
     }
 
     private static func timeString(_ date: Date, calendar: Calendar) -> String {
-        let pattern = calendar.component(.second, from: date) == 0 ? "h:mm a" : "h:mm:ss a"
-        return format(date, calendar: calendar, pattern: pattern)
+        let template = calendar.component(.second, from: date) == 0 ? "jmm" : "jmmss"
+        return CalcDateFormatters.string(
+            from: date, calendar: calendar, zone: calendar.timeZone, template: template)
     }
 
     /// The answer's own weekday, which the date itself never spells out.
@@ -919,7 +935,6 @@ enum CalcDateTime {
         "weekday", "weekdays"
     ]
 
-    /// Gregorian weekday numbers (Sunday = 1).
     private static let weekdayByName: [String: Int] = [
         "sunday": 1, "sun": 1, "monday": 2, "mon": 2, "tuesday": 3, "tue": 3, "tues": 3,
         "wednesday": 4, "wed": 4, "thursday": 5, "thu": 5, "thurs": 5, "friday": 6, "fri": 6,

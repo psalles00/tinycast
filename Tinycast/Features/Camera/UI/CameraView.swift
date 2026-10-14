@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// The standalone camera: a live stage, a mirror switch, and a photo straight to the clipboard.
 struct CameraView: View {
     let coordinator: CameraCoordinator
 
@@ -14,7 +13,7 @@ struct CameraView: View {
         }
         .frame(width: Theme.Size.cameraStage.width)
         .background(Theme.Colors.panelScrim)
-        .background(VisualEffectView())
+        .background(GlassEffectView())
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.dialog, style: .continuous))
         .panelEntrance()
     }

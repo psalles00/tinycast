@@ -61,7 +61,7 @@ struct OnboardingView: View {
             VStack(spacing: Theme.Spacing.xs) {
                 Text(title)
                     .font(.title2.weight(.bold))
-                Text(subtitle)
+                subtitle
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -94,11 +94,11 @@ struct OnboardingView: View {
         }
     }
 
-    private var subtitle: String {
+    private var subtitle: Text {
         switch step {
-        case 0: "Set a shortcut to summon the launcher from anywhere."
-        case 1: "Let Tinycast paste items back into the app you were using."
-        case 2: "Bring your shortcuts, favorites, and clipboard history along."
+        case 0: Text("Set a shortcut to summon the launcher from anywhere.")
+        case 1: Text("Let Tinycast paste items back into the app you were using.")
+        case 2: Text("Bring your shortcuts, favorites, and clipboard history along.")
         default: readyMessage
         }
     }
@@ -119,11 +119,11 @@ struct OnboardingView: View {
         }
     }
 
-    private var readyMessage: String {
+    private var readyMessage: Text {
         if let caps = hotKeys.binding(for: .togglePalette)?.keycaps {
-            return "Press \(caps.joined()) anytime to start using Tinycast."
+            return Text("Press \(KeyCapChip.inlineText(caps)) anytime to start using Tinycast.")
         }
-        return "Tinycast is ready. Set a shortcut in Settings to summon it."
+        return Text("Tinycast is ready. Set a shortcut in Settings to summon it.")
     }
 
     // MARK: - Step content
@@ -195,7 +195,7 @@ struct OnboardingView: View {
                     subtitle: "The password you set when exporting from Raycast.",
                     systemImage: "key", tint: .gray
                 ) {
-                    SecureField("Passphrase", text: $model.passphrase)
+                    RevealableSecureField(title: "Passphrase", text: $model.passphrase)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 150)
                         .onSubmit { model.run(core: core) }
@@ -387,7 +387,7 @@ final class OnboardingModel {
 
     var fileSubtitle: String {
         guard let name = file?.lastPathComponent else {
-            return "Choose a .rayconfig file exported from Raycast."
+            return "Choose a .rayconfig file exported from Raycast v2.0 or newer."
         }
         return "\(name) — \(isRaycastExport ? "Raycast export" : "not a Raycast export")"
     }

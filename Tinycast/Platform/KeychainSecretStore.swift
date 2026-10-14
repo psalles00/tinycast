@@ -1,7 +1,6 @@
 import Foundation
 import Security
 
-/// Login-Keychain generic passwords, one item per account inside a caller-named scope.
 struct KeychainSecretStore: Sendable {
     enum StoreError: Error {
         case invalidEncoding
@@ -13,6 +12,7 @@ struct KeychainSecretStore: Sendable {
     /// Every scope the app stores under, named here so the whole keychain surface is one list.
     static let aiAPIKeys = KeychainSecretStore(scope: "ai-api-keys")
     static let mcpSecrets = KeychainSecretStore(scope: "mcp-secrets")
+    static let installedAIEnvironment = KeychainSecretStore(scope: "installed-ai-environment")
 
     init(scope: String, bundleIdentifier: String? = Bundle.main.bundleIdentifier) {
         service = "\(bundleIdentifier ?? "com.tinycast.app").\(scope)"

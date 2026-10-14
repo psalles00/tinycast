@@ -45,7 +45,6 @@ extension ColorValue {
         self.init(red: red + base, green: green + base, blue: blue + base, alpha: alpha)
     }
 
-    /// Hue, saturation and lightness, the inverse of the HSL initialiser.
     var hsl: (hue: Double, saturation: Double, lightness: Double) {
         let maximum = max(red, green, blue)
         let minimum = min(red, green, blue)
@@ -71,7 +70,6 @@ extension ColorValue {
     /// How much untrimmed text is worth trimming first; past this nothing can be a colour anyway.
     private static let scanLimit = 2048
 
-    /// Parse a whole trimmed token, or nil when it is not a colour.
     static func parse(_ text: String) -> ColorValue? {
         // Every visible row runs this per render, so the shape is rejected before allocating.
         guard text.utf8.count <= scanLimit, couldBeColor(text.utf8) else { return nil }
@@ -128,7 +126,7 @@ extension ColorValue {
             alpha: channels.count == 4 ? channels[3] : 1)
     }
 
-    /// `rgb()` / `rgba()` / `hsl()` / `hsla()`, in both the comma and the CSS4 space form.
+    /// `rgb()` / `rgba()` / `hsl()` / `hsla()` / `oklch()`, in the comma and CSS4 space forms.
     private static func parseFunctional(_ token: String) -> ColorValue? {
         guard let open = token.firstIndex(of: "("), token.hasSuffix(")") else { return nil }
         let function = token[token.startIndex..<open].lowercased()
@@ -151,6 +149,15 @@ extension ColorValue {
             else { return nil }
             return ColorValue(
                 hue: hue, saturation: saturation, lightness: lightness, alpha: alpha)
+        case "oklch":
+            // A percentage chroma is a fraction of 0.4, the bound CSS gives the axis.
+            guard let lightness = component(parts[0], scale: 1),
+                let chroma = component(parts[1], scale: 1),
+                let hue = angle(parts[2])
+            else { return nil }
+            return ColorValue(
+                lightness: lightness, chroma: parts[1].hasSuffix("%") ? chroma * 0.4 : chroma,
+                hue: hue, alpha: alpha)
         default:
             return nil
         }

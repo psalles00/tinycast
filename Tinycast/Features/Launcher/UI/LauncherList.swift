@@ -7,7 +7,9 @@ struct LauncherList: View {
     /// The flat row id the screen has selected, not an entry id: a fallback can repeat a result.
     let selectedRowID: String?
     let favoriteCount: Int
-    let showSections: Bool
+    let meetingCount: Int
+    let suggestionCount: Int
+    let matchCount: Int
     /// Changes only when the list should scroll, so mouse selection never yanks it.
     let scroll: ScrollIntent
     /// The card at flat index 0, when one leads. At most one ever does.
@@ -17,6 +19,7 @@ struct LauncherList: View {
     var onCardActions: () -> Void = {}
     let onActivate: (AppEntry) -> Void
     let onActions: (AppEntry) -> Void
+    let onDropped: () -> Void
     /// The `Use "…" with` section, always last; nil when nothing is typed.
     var fallbacks: FallbackSection?
     @Environment(RunningAppsMonitor.self) private var runningApps
@@ -74,7 +77,6 @@ struct LauncherList: View {
         }
     }
 
-    /// Whether the selection sits on flat index 0: the card, else the first result.
     private var firstRowSelected: Bool {
         card != nil ? cardSelected : selectedRowID != nil && selectedRowID == results.first?.id
     }
@@ -87,16 +89,14 @@ struct LauncherList: View {
     }
 
     private var rows: [Row] {
-        var cardRows: [Row] = []
-        if let card { cardRows = [.header(card.sectionTitle), .card(card)] }
-        guard showSections else {
-            guard !results.isEmpty else { return cardRows + fallbackRows }
-            return cardRows + [.header("Results")] + results.map { .app($0, slot: nil) }
-                + fallbackRows
-        }
-        var rows: [Row] = cardRows
+        var rows: [Row] = []
+        if let card { rows = [.header(card.sectionTitle), .card(card)] }
         let favorites = results.prefix(favoriteCount)
-        let rest = results.dropFirst(favoriteCount)
+        let meetings = results.dropFirst(favoriteCount).prefix(meetingCount)
+        let suggestions = results.dropFirst(favoriteCount + meetingCount).prefix(suggestionCount)
+        let pinnedCount = favoriteCount + meetingCount + suggestionCount
+        let matches = results.dropFirst(pinnedCount).prefix(matchCount)
+        let rest = results.dropFirst(pinnedCount + matchCount)
         var grouped: [AppEntry.Kind: [AppEntry]] = [:]
         for app in rest { grouped[app.kind, default: []].append(app) }
         if !favorites.isEmpty {
@@ -107,11 +107,23 @@ struct LauncherList: View {
                         FavoriteGridEntry(app: $1, slot: FavoriteSlots.digit(at: $0))
                     }))
         }
+        if !meetings.isEmpty {
+            rows.append(.header(AppEntry.Kind.meeting.descriptor.sectionTitle))
+            rows.append(contentsOf: meetings.map { .app($0, slot: nil) })
+        }
+        if !suggestions.isEmpty {
+            rows.append(.header("Suggestions"))
+            rows.append(contentsOf: suggestions.map { .app($0, slot: nil) })
+        }
+        if !matches.isEmpty {
+            rows.append(.header("Results"))
+            rows.append(contentsOf: matches.map { .app($0, slot: nil) })
+        }
         // Publication order, so rows match the flat index.
         let kinds: [AppEntry.Kind] = [
-            .meeting, .application, .systemSettings, .extensionCommand, .quicklink, .snippet,
-            .systemAction, .windowLayout, .windowCommand, .customCommand, .quickAction,
-            .command
+            .meeting, .application, .systemSettings, .extensionCommand, .quicklink, .appleShortcut,
+            .snippet, .systemAction, .windowLayout, .windowRoom, .windowCommand, .customCommand,
+            .quickAction, .command
         ]
         for kind in kinds {
             guard let group = grouped[kind], !group.isEmpty else { continue }
@@ -166,7 +178,7 @@ struct LauncherList: View {
                                         slot: slot
                                     )
                                     .contentShape(Rectangle())
-                                    .onTapGesture { onActivate(app) }
+                                    .onRowTap(drag: drag(for: app)) { onActivate(app) }
                                     .onRightClick { onActions(app) }
                                     .selectionFrame(app.id == selectedRowID)
                                 case .fallback(let app, let index):
@@ -195,6 +207,14 @@ struct LauncherList: View {
                 }
             }
         }
+    }
+
+    /// Cache-only icon: the row holds its own smaller bitmap, and a decode would stall the drag.
+    private func drag(for app: AppEntry) -> RowDrag? {
+        guard app.canDragOut else { return nil }
+        return RowDrag(
+            item: { .file(app.url, image: IconCache.cached(app.iconSource, fileURL: app.url)) },
+            dropped: onDropped)
     }
 }
 
@@ -238,7 +258,6 @@ private struct AppRow: View {
         return .clear
     }
 
-    /// Keycaps for this entry's hotkey, or `nil` if none is bound.
     private var shortcutCaps: [String]? {
         guard let action = app.hotKeyAction else { return nil }
         return hotKeys.binding(for: action)?.keycaps
@@ -246,8 +265,8 @@ private struct AppRow: View {
 
     var body: some View {
         HStack(spacing: metrics.spacing.lg) {
-            AppIconView(app: app, pointSize: metrics.size.rowIcon)
-                .frame(width: metrics.size.rowIcon, height: metrics.size.rowIcon)
+            AppIconView(app: app, pointSize: metrics.size.resultRowIcon)
+                .frame(width: metrics.size.resultRowIcon, height: metrics.size.resultRowIcon)
                 .overlay(alignment: .bottom) {
                     if running {
                         Circle()
@@ -256,6 +275,11 @@ private struct AppRow: View {
                             .offset(y: 3)
                     }
                 }
+            if app.kind == .meeting {
+                MeetingEntryContent(entryID: app.id) { meeting, _ in
+                    CalendarBar(color: meeting.calendarColor)
+                }
+            }
             Text(app.name)
                 .font(metrics.typography.rowTitle)
                 .lineLimit(1)
@@ -288,12 +312,13 @@ private struct AppRow: View {
                 ExtensionRefreshIndicator(state: refresh)
                     .font(metrics.typography.rowTrailing)
             }
-            // Holding ⌘ turns the trailing label into the chord that launches this row.
             if let slot, palette.commandHeld {
                 HStack(spacing: metrics.spacing.xxs) {
                     KeyCapChip(text: "⌘", style: .outline)
                     KeyCapChip(text: String(slot), style: .outline)
                 }
+            } else if app.kind == .meeting {
+                MeetingEntryContent(entryID: app.id) { MeetingTiming(meeting: $0, now: $1) }
             } else {
                 Text(app.kindLabel)
                     .font(metrics.typography.rowTrailing)

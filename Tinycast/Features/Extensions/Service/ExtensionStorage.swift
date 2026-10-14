@@ -9,9 +9,11 @@ final class ExtensionStorage {
         var preferences: [String: StoredValue] = [:]
         /// A search-bar dropdown's `storeValue` pick — host UI state, so not `LocalStorage`.
         var accessoryValues: [String: String] = [:]
+        /// Each OAuth provider's token set, as the JSON the runtime wrote.
+        var oauthTokens: [String: String] = [:]
 
         enum CodingKeys: String, CodingKey {
-            case localStorage, caches, preferences, accessoryValues
+            case localStorage, caches, preferences, accessoryValues, oauthTokens
         }
 
         init() {}
@@ -28,6 +30,8 @@ final class ExtensionStorage {
                 try store.decodeIfPresent([String: StoredValue].self, forKey: .preferences) ?? [:]
             accessoryValues =
                 try store.decodeIfPresent([String: String].self, forKey: .accessoryValues) ?? [:]
+            oauthTokens =
+                try store.decodeIfPresent([String: String].self, forKey: .oauthTokens) ?? [:]
         }
     }
 
@@ -59,6 +63,7 @@ final class ExtensionStorage {
             case .string(let value): self = .string(value)
             case .number(let value): self = .number(value)
             case .bool(let value): self = .bool(value)
+            case .application(let path): self = .string(path)
             }
         }
 
@@ -137,6 +142,17 @@ final class ExtensionStorage {
         mutate(name) { $0.caches[namespace] = [:] }
     }
 
+    // MARK: - OAuth tokens
+
+    func oauthTokens(extension name: String, provider: String) -> String? {
+        store(for: name).oauthTokens[provider]
+    }
+
+    /// `nil` signs the provider out.
+    func setOAuthTokens(extension name: String, provider: String, tokens: String?) {
+        mutate(name) { $0.oauthTokens[provider] = tokens }
+    }
+
     // MARK: - Preferences
 
     func preference(extension name: String, key: String) -> ExtensionPreferenceValue? {
@@ -159,7 +175,7 @@ final class ExtensionStorage {
     ) -> [String: ExtensionPreferenceValue] {
         var resolved: [String: ExtensionPreferenceValue] = [:]
         for schema in schemas {
-            resolved[schema.name] = preference(extension: name, key: schema.name) ?? schema.effectiveDefault
+            resolved[schema.name] = schema.runtimeValue(preference(extension: name, key: schema.name))
         }
         return resolved
     }

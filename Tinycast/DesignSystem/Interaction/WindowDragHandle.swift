@@ -25,7 +25,19 @@ extension View {
     }
 }
 
-/// Drags a text field that has nothing to select; the moment it has text, editing owns every press.
+/// A background, so only empty space drags; `performDrag(with:)` lets the window pick what moves.
+struct WindowDragBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { BackgroundDragView() }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+private final class BackgroundDragView: NSView {
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
+    }
+}
+
 struct EmptyFieldDragHandle: NSViewRepresentable {
     var isEmpty: Bool
     var onBegan: () -> Void
