@@ -35,17 +35,44 @@ struct EmojiScreen: PaletteScreen {
             filter: vm.emojiCategoryFilter, columns: columns)
     }
 
+    private var mixedSections: [PSEmojiIconGridSection] {
+        var result = sections.map {
+            PSEmojiIconGridSection(
+                title: $0.title, entries: $0.entries.map(PSEmojiIconEntry.emoji), start: $0.start)
+        }
+        if vm.emojiCategoryFilter == .all || vm.emojiCategoryFilter == .icons3D {
+            let matches = core.ps3DIcons.matches(query: vm.query)
+            let icons = Array(matches.prefix(100))
+            if !icons.isEmpty {
+                result.append(
+                    PSEmojiIconGridSection(
+                        title: matches.count > 100
+                            ? "3D Icons · 100 de \(matches.count) — refine a busca" : "3D Icons",
+                        entries: icons.map(PSEmojiIconEntry.icon),
+                        start: result.reduce(0) { $0 + $1.entries.count }))
+            }
+        }
+        return result
+    }
+
+    private func icon(at selection: Int) -> PS3DIcon? {
+        guard rows.indices.contains(selection), case .icon(let icon) = rows[selection] else { return nil }
+        return icon
+    }
+
     /// Flat grid order across sections — what the selection indexes.
-    var rows: [EmojiEntry] { sections.flatMap(\.entries) }
+    var rows: [PSEmojiIconEntry] { mixedSections.flatMap(\.entries) }
 
     var primaryActionTitle: String { vm.pasteTarget?.pasteTitle ?? "Paste" }
 
     private func entry(at selection: Int) -> EmojiEntry? {
         let rows = rows
-        return rows.indices.contains(selection) ? rows[selection] : nil
+        guard rows.indices.contains(selection), case .emoji(let entry) = rows[selection] else { return nil }
+        return entry
     }
 
     func actions(at selection: Int) -> PopoverMenuContent? {
+        if let icon = icon(at: selection) { return core.ps3DIcons.actions(icon) }
         guard let entry = entry(at: selection) else { return nil }
         let pins = visiblePins
         return EmojiActionsMenu.content(
@@ -58,11 +85,13 @@ struct EmojiScreen: PaletteScreen {
     }
 
     func activate(at selection: Int) {
+        if let icon = icon(at: selection) { core.ps3DIcons.deliver(icon); return }
         guard let entry = entry(at: selection) else { return }
         core.emojiCoordinator.pasteEmoji(entry)
     }
 
     func secondary(at selection: Int) -> Bool {
+        if let icon = icon(at: selection) { core.ps3DIcons.deliver(icon, paste: false); return true }
         guard let entry = entry(at: selection) else { return false }
         core.emojiCoordinator.copyEmoji(entry)
         return true
@@ -70,6 +99,7 @@ struct EmojiScreen: PaletteScreen {
 
     /// ⌥↵ — the palette stays up, so a run of emoji goes over without re-summoning it.
     func pasteKeepingWindowOpen(at selection: Int) -> Bool {
+        if let icon = icon(at: selection) { core.ps3DIcons.deliver(icon, keepOpen: true); return true }
         guard let entry = entry(at: selection) else { return false }
         core.emojiCoordinator.pasteEmojiKeepingWindowOpen(entry)
         return true
@@ -103,7 +133,7 @@ struct EmojiScreen: PaletteScreen {
         switch vm.emojiCategoryFilter {
         case .all: start = visiblePins.count
         case .frequentlyUsed: start = 0
-        case .pinned, .category: return
+        case .pinned, .category, .icons3D: return
         }
         vm.selection = EmojiGridGeometry.selection(
             vm.selection, afterSectionAt: start, changesFrom: old, to: new)
@@ -111,7 +141,7 @@ struct EmojiScreen: PaletteScreen {
 
     /// One visual row vertically, spilling into the neighbour by column; one cell horizontally.
     func move(_ delta: Int, axis: PaletteAxis, from selection: Int) -> Int? {
-        let sections = sections
+        let sections = mixedSections
         let count = sections.reduce(0) { $0 + $1.entries.count }
         guard count > 0 else { return selection }
         switch axis {
@@ -125,18 +155,18 @@ struct EmojiScreen: PaletteScreen {
     }
 
     func body(selection: Int, scroll: ScrollIntent) -> AnyView {
-        AnyView(content(selection: selection, scroll: scroll))
+        AnyView(content(selection: selection, scroll: scroll).task { await core.ps3DIcons.load() })
     }
 
     @ViewBuilder
     private func content(selection: Int, scroll: ScrollIntent) -> some View {
-        let sections = sections
+        let sections = mixedSections
         if !index.isLoaded {
             EmptyResults(text: "Loading emoji…")
         } else if sections.isEmpty {
-            EmptyResults(text: "No emoji found")
+            EmptyResults(text: core.ps3DIcons.errorMessage ?? "No emoji, symbols or 3D icons found")
         } else {
-            EmojiGridView(
+            PSEmojiIconGridView(
                 sections: sections,
                 selection: selection,
                 tone: tone,

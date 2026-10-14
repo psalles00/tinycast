@@ -314,6 +314,9 @@ run dictation-worker-test  Tinycast/Features/Dictation/Model/DictationModel.swif
                            Tinycast/Features/Dictation/Service/DictationModelStore.swift \
                            Tinycast/Features/Dictation/Service/DictationModelDownloader.swift \
                            Tinycast/Platform/ProcessExit.swift Tinycast/Platform/AppPaths.swift
+run ps-icons-test          Tinycast/PSCustomizations/PS3DIconCatalog.swift \
+                           Tinycast/Features/Emoji/Model/EmojiCatalog.swift \
+                           Tinycast/Features/Emoji/Model/EmojiGridGeometry.swift
 run ps-favorites-test      Tinycast/PSCustomizations/PSFavoriteFolders.swift \
                            Tinycast/PSCustomizations/FavoriteGridLayout.swift \
                            Tinycast/PSCustomizations/PSShortcutConflictPolicy.swift \

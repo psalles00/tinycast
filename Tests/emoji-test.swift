@@ -37,8 +37,8 @@ struct EmojiTests {
             EmojiCategory.allCases.allSatisfy { !$0.systemImage.isEmpty },
             "every category has a menu symbol")
         expect(
-            EmojiCategoryFilter.allCases.count == EmojiCategory.allCases.count + 3,
-            "all, pinned and frequent precede every catalog category")
+            EmojiCategoryFilter.allCases.count == EmojiCategory.allCases.count + 4,
+            "all, pinned, frequent and 3D icons precede every emoji category")
         expect(EmojiCategoryFilter.allCases.first == .all, "All Categories is the default row")
         expect(EmojiCategory.symbols.itemTitle == "Symbol", "symbol categories use Symbol actions")
         expect(EmojiCategory.flags.itemTitle == "Emoji", "emoji categories use Emoji actions")

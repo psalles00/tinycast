@@ -33,6 +33,7 @@ enum EmojiGrid {
                 for section in index.categorySections {
                     append(section.category.title, section.entries)
                 }
+            case .icons3D: break
             case .pinned:
                 append("Pinned", pinned.glyphs.compactMap(index.entry(for:)))
             case .frequentlyUsed:
@@ -46,6 +47,8 @@ enum EmojiGrid {
             let results = index.search(query, frequent: frequent)
             let filtered: [EmojiEntry]
             switch filter {
+            case .icons3D:
+                filtered = []
             case .all:
                 filtered = results
             case .pinned:

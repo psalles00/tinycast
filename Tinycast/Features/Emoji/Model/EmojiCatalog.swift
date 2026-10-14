@@ -72,16 +72,18 @@ enum EmojiCategoryFilter: Hashable, Sendable {
     case all
     case pinned
     case frequentlyUsed
+    case icons3D
     case category(EmojiCategory)
 
     static let allCases: [Self] =
-        [.all, .pinned, .frequentlyUsed] + EmojiCategory.allCases.map(Self.category)
+        [.all, .pinned, .frequentlyUsed, .icons3D] + EmojiCategory.allCases.map(Self.category)
 
     var title: String {
         switch self {
         case .all: "All Categories"
         case .pinned: "Pinned"
         case .frequentlyUsed: "Frequently Used"
+        case .icons3D: "3D Icons"
         case .category(let category): category.title
         }
     }
@@ -91,6 +93,7 @@ enum EmojiCategoryFilter: Hashable, Sendable {
         case .all: "square.grid.3x3.square"
         case .pinned: "pin"
         case .frequentlyUsed: "clock"
+        case .icons3D: "cube.transparent"
         case .category(let category): category.systemImage
         }
     }

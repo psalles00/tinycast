@@ -59,7 +59,7 @@ enum CommandID: String, CaseIterable, Sendable {
         case .calculatorHistory: return "Calculator History"
         case .clipboardHistory: return "Clipboard History"
         case .pasteSequentially: return "Paste Sequentially"
-        case .searchEmoji: return "Search Emoji & Symbols"
+        case .searchEmoji: return "Search Emoji, Symbols & 3D Icons"
         case .searchFiles: return "Search Files"
         case .searchMenuItems: return "Search Menu Bar Items"
         case .switchWindows: return "Switch Windows"

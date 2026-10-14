@@ -58,6 +58,7 @@ final class AppCore {
     let updateChecker = UpdateCheckStore()
     let supportReminders: SupportReminderStore
     let emojiIndex = EmojiIndex()
+    @ObservationIgnored private(set) lazy var ps3DIcons = PS3DIconCoordinator(core: self, windowController: windowController)
     let frequentEmoji = FrequentEmojiStore()
     let pinnedEmoji = PinnedEmojiStore()
     let runningApps = RunningAppsMonitor()

@@ -27,6 +27,8 @@ struct FormInputTests {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 300, height: height),
             styleMask: .borderless, backing: .buffered, defer: false)
+        // Pixel assertions below detect white ink; use a fixed appearance, independent of the Mac.
+        window.appearance = NSAppearance(named: .darkAqua)
         window.isReleasedWhenClosed = false
         window.contentView = content
         content.layoutSubtreeIfNeeded()
