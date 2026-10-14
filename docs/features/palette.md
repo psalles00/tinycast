@@ -26,7 +26,7 @@ The command palette is a borderless floating `NSPanel` hosting SwiftUI; see
   the panel becomes key, the configured source is applied through `PalettePanel.fieldEditorContext`, and
   the captured source is restored on hide and on termination — but only when the palette is still on the
   source it applied, so a switch made since, by the user or another app, stands. Never applied globally:
-  the panel does not activate, so a global switch would land on whichever app is still frontmost.
+  the input source belongs to the palette's field editor.
 
 ## Summoning
 
@@ -40,7 +40,7 @@ The command palette is a borderless floating `NSPanel` hosting SwiftUI; see
                                             · resolves PasteTarget once per summon
                                             · resolves the screen anchor once per summon
                                             · captures the input source to restore, once per summon
-                                            · positions, lays out off-screen, orders front
+                                            · positions, lays out off-screen, activates the app, orders front
                                                               ↓
                                                     RootPaletteView.body
                                             · focuses the search field

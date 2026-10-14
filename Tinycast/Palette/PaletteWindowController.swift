@@ -90,7 +90,8 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             core.clipboardStore.setTextSearchActive(true)
             // Only while we are on screen: a system-wide tap has no business outliving the window.
             commandEscapeTap.enable()
-            // Non-activating, so summoning never raises our own aux windows behind it.
+            // A global hotkey must transfer keyboard ownership from the previous application.
+            NSApp.activate()
             panel.makeKeyAndOrderFront(nil)
             panel.orderFrontRegardless()
             // A never-activated login item can drop the first key request, so re-assert.
