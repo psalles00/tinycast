@@ -383,9 +383,15 @@ struct RootPaletteView: View {
     @ViewBuilder
     private func stateObservers(_ content: some View) -> some View {
         emojiObservers(content)
-            // Every show bumps focusToken so the search field refocuses.
-            .onChange(of: vm.focusToken) {
-                searchFocused = !screen.hidesSearchField
+            .task(id: vm.focusToken) {
+                guard !screen.hidesSearchField, !vm.menuOpen, !vm.isControlListOpen,
+                    !vm.isEditingField else { return }
+                // A retained true FocusState cannot renew a lost AppKit first responder.
+                searchFocused = false
+                await Task.yield()
+                guard !Task.isCancelled, vm.isVisible, !screen.hidesSearchField,
+                    !vm.menuOpen, !vm.isControlListOpen, !vm.isEditingField else { return }
+                searchFocused = true
             }
             // A preserved screen re-summons as it was left, so a menu must end with the palette.
             .modifier(PaletteHideObserver { if menuOpen { closeMenus() } })

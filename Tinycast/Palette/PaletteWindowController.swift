@@ -21,6 +21,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     private let dropGuides = PaletteDropGuideController()
     /// ⌘V: `Edit ▸ Paste` claims it before `sendEvent` whenever the board also carries text.
     private var pasteMonitor: Any?
+    private var activationObserver: NotificationToken?
     /// ⌘⎋: the window server claims it, so no keystroke is left for the responder chain to see.
     private lazy var commandEscapeTap = CommandEscapeTap { [weak self] in
         guard let self, self.panel?.isKeyWindow == true else { return false }
@@ -94,6 +95,11 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             NSApp.activate()
             panel.makeKeyAndOrderFront(nil)
             panel.orderFrontRegardless()
+            PSPaletteWindowStyle.recordFocus(panel, phase: "summon")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak panel] in
+                guard let panel, panel.isVisible else { return }
+                PSPaletteWindowStyle.recordFocus(panel, phase: "settled")
+            }
             // A never-activated login item can drop the first key request, so re-assert.
             DispatchQueue.main.async { [weak panel] in
                 guard let panel, panel.isVisible, !panel.isKeyWindow else { return }
@@ -245,6 +251,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
 
     func windowDidBecomeKey(_ notification: Notification) {
         panel?.level = .palette
+        if let panel { PSPaletteWindowStyle.recordFocus(panel, phase: "key") }
         DispatchQueue.main.async { [weak self] in
             guard let self, let panel, panel.isVisible, panel.isKeyWindow else { return }
             // Activation is asynchronous: request search focus after the window actually takes key.
@@ -477,6 +484,20 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
             }
         }
         self.panel = panel
+        let center = NotificationCenter.default
+        let token = center.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: NSApp, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, let panel = self.panel, panel.isVisible, panel.isKeyWindow else { return }
+                PSPaletteWindowStyle.recordFocus(panel, phase: "activated")
+                if !self.core.palette.menuOpen, !self.core.palette.isControlListOpen,
+                    !self.core.palette.isEditingField {
+                    self.core.palette.focusToken = UUID()
+                }
+            }
+        }
+        activationObserver = NotificationToken(token, center: center)
         return panel
     }
 

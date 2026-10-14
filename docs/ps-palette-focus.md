@@ -20,3 +20,21 @@ Opening an Actions or category/control-list menu transfers key ownership to its 
 The parent dismissal delegate preserves both menu types; AppKit's automatic hidesOnDeactivate is
 also off so the controller remains the only dismissal authority. Losing focus outside these
 owned interactions continues through the ordinary dismissal path.
+
+Physical keyboard testing still reproduced the problem after build 1384. Search focus now resets
+before being requested again, with a cancellable SwiftUI task keyed by focusToken. The controller
+also renews that token after NSApplication actually becomes active. This avoids retaining a true
+FocusState while AppKit has lost the field editor. Menus and form editors keep their existing guards.
+
+PSPaletteFocus unified logs report activation, key ownership, frontmost process ID and responder
+class at summon and after settling. They never record queries or keys. Automation can activate its
+target before sending input, so a successful automated search cannot replace a physical hotkey test.
+
+On 2026-10-14 Pedro confirmed physical typing without a click on installed build 1390, then
+confirmed two more hide/summon cycles after Settings opened and closed. Runtime logs verified
+input arriving at an editable field, no menu freeze and Accessibility trusted. The PS installer
+now uses a persistent local code-signing certificate; builds 1388 and 1389 had different executable
+hashes but the same certificate-bound designated requirement and retained the Accessibility grant.
+Input telemetry is bounded to twelve events per key acquisition and records only modifier masks,
+field editability and menu state, never characters or key codes. Use Check for Updates - PS and keep
+the same signing identity; installing another publisher's signature may require a fresh grant.

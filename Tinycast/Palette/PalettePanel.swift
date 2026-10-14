@@ -21,6 +21,7 @@ final class PalettePanel: NSPanel {
     var onFavoriteGridArrow: ((NSEvent) -> Bool)?
     var onDismissMenu: (() -> Void)?
     private var dismissingMouseButton: Int?
+    private var inputObservations = 0
     /// Arms hover from `sendEvent`, the one place both event streams pass through.
     weak var paletteState: PaletteState? {
         didSet {
@@ -178,6 +179,11 @@ final class PalettePanel: NSPanel {
     }
 
     override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown, inputObservations < 12 {
+            inputObservations += 1
+            PSPaletteWindowStyle.recordInput(
+                self, modifiers: event.modifierFlags.rawValue, menuOpen: paletteState?.menuOpen == true)
+        }
         if consumeMenuDismissal(event) { return }
         if event.type == .scrollWheel, paletteState?.mode.isNativeEditor == true {
             onDismissMenu?()
@@ -234,6 +240,11 @@ final class PalettePanel: NSPanel {
             return
         }
         super.sendEvent(event)
+    }
+
+    override func becomeKey() {
+        inputObservations = 0
+        super.becomeKey()
     }
 
     private func consumeMenuDismissal(_ event: NSEvent) -> Bool {
