@@ -21,6 +21,7 @@ enum AppActionsMenu {
         // A query-driven row lives only for its query, so no preference could outlive it.
         let isPersistent = !CommandCatalog.isQueryDriven(app)
         if isPersistent {
+            items += core.psFavoritesCoordinator.itemMenu(app, favorite: favorites.isFavorite)
             items.append(
                 PopoverMenuItem(
                     title: favorites.isFavorite ? "Remove from Favorites" : "Add to Favorites",

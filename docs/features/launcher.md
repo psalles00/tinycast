@@ -685,6 +685,8 @@ whose icon moved.
 
 ## Favorites
 
+The PS build renders this section as an eight-column icon grid with virtual folders and section-level vertical navigation. See [ps-favorites.md](../ps-favorites.md) for the PS menu, alias and shortcut editors and their persistence rules.
+
 `FavoritesStore.keys` is the order — the array *is* the ranking, and it only shows while the query is
 empty, where `AppIndex.orderedResults` pins it as a prefix of the results and counts it in
 `Results.favoriteCount`. `LauncherScreen` reads that count once in `init`, and the list, the reorder

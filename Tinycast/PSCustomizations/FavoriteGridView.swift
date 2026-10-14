@@ -1,16 +1,35 @@
 import SwiftUI
 
 struct FavoriteGridEntry: Identifiable {
-    let app: AppEntry
+    enum Content {
+        case app(AppEntry)
+        case folder(PSFavoriteFolder, count: Int)
+    }
+    let content: Content
     let slot: Character?
-    var id: String { app.id }
+
+    init(app: AppEntry, slot: Character?) { content = .app(app); self.slot = slot }
+    init(folder: PSFavoriteFolder, count: Int, slot: Character?) {
+        content = .folder(folder, count: count)
+        self.slot = slot
+    }
+    var id: String {
+        switch content {
+        case .app(let app): return app.id
+        case .folder(let folder, _): return "ps-favorite-folder-" + folder.id.uuidString
+        }
+    }
+    var app: AppEntry? { if case .app(let app) = content { return app }; return nil }
+    var name: String {
+        switch content { case .app(let app): return app.name; case .folder(let folder, _): return folder.name }
+    }
 }
 
 struct FavoriteGridView: View {
     let favorites: [FavoriteGridEntry]
     let selectedRowID: String?
-    let onActivate: (AppEntry) -> Void
-    let onActions: (AppEntry) -> Void
+    let onActivate: (FavoriteGridEntry) -> Void
+    let onActions: (FavoriteGridEntry) -> Void
     @Environment(RunningAppsMonitor.self) private var runningApps
 
     private let columns = Array(
@@ -18,19 +37,27 @@ struct FavoriteGridView: View {
         count: FavoriteGridLayout.columnCount)
 
     var body: some View {
+        if favorites.isEmpty {
+            Text("Pasta vazia. No menu ⌘K de um favorito, escolha Mover para pasta.")
+                .font(Theme.Typography.rowTrailing)
+                .foregroundStyle(Theme.Colors.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, Theme.Spacing.md)
+        }
         LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
             ForEach(favorites) { favorite in
                 FavoriteGridCell(
-                    app: favorite.app,
+                    favorite: favorite,
                     selected: favorite.id == selectedRowID,
-                    running: runningApps.isRunning(favorite.app),
+                    running: favorite.app.map(runningApps.isRunning) ?? false,
                     slot: favorite.slot
                 )
                 .contentShape(Rectangle())
-                .onTapGesture { onActivate(favorite.app) }
-                .onRightClick { onActions(favorite.app) }
-                .onMiddleClick { onActivate(favorite.app) }
+                .onTapGesture { onActivate(favorite) }
+                .onRightClick { onActions(favorite) }
+                .onMiddleClick { onActivate(favorite) }
                 .id(favorite.id)
+                .selectionFrame(favorite.id == selectedRowID)
             }
         }
         .padding(.bottom, Theme.Spacing.sm)
@@ -38,7 +65,7 @@ struct FavoriteGridView: View {
 }
 
 private struct FavoriteGridCell: View {
-    let app: AppEntry
+    let favorite: FavoriteGridEntry
     let selected: Bool
     let running: Bool
     let slot: Character?
@@ -53,8 +80,8 @@ private struct FavoriteGridCell: View {
 
     var body: some View {
         VStack(spacing: Theme.Spacing.xs) {
-            AppIconView(app: app)
-                .frame(width: 30, height: 30)
+            icon
+                .frame(width: 44, height: 44)
                 .overlay(alignment: .bottomTrailing) {
                     if running {
                         Circle()
@@ -62,13 +89,13 @@ private struct FavoriteGridCell: View {
                             .frame(width: 4, height: 4)
                     }
                 }
-            Text(app.name)
+            Text(favorite.name)
                 .font(Theme.Typography.rowTrailing)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity, minHeight: 64)
+        .frame(maxWidth: .infinity, minHeight: 80)
         .padding(.horizontal, Theme.Spacing.xs)
         .padding(.vertical, Theme.Spacing.sm)
         .background(
@@ -82,6 +109,22 @@ private struct FavoriteGridCell: View {
             }
         }
         .armedHover($hovered)
-        .accessibilityLabel(app.name)
+        .accessibilityLabel(favorite.name)
+    }
+
+    @ViewBuilder
+    private var icon: some View {
+        switch favorite.content {
+        case .app(let app): AppIconView(app: app, pointSize: 44)
+        case .folder(_, let count):
+            SymbolImage(name: "folder.fill", size: 40)
+                .foregroundStyle(Theme.Colors.textSecondary)
+                .overlay(alignment: .bottomTrailing) {
+                    Text("\(count)")
+                        .font(Theme.Typography.keyCap)
+                        .padding(3)
+                        .background(Theme.Colors.selection, in: Circle())
+                }
+        }
     }
 }

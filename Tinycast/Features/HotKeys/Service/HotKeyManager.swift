@@ -323,17 +323,17 @@ final class HotKeyManager {
 
     /// A hold reserves its physical modifier across both tap gestures.
     func conflictOwner(of binding: HotKeyBinding, excluding action: HotKeyAction) -> String? {
-        for candidate in candidateActions where candidate != action {
-            guard let other = self.binding(for: candidate) else { continue }
-            let holdsModifier =
-                dictationHoldToTalk
+        conflictingActions(of: binding, excluding: action).first.map(displayName)
+    }
+
+    func conflictingActions(of binding: HotKeyBinding, excluding action: HotKeyAction) -> [HotKeyAction] {
+        PSShortcutConflictPolicy.owners(
+            of: binding, excluding: action, candidates: candidateActions, lookup: self.binding
+        ) { candidate, other in
+            self.dictationHoldToTalk
                 && (action == .dictation && binding.holdKey != nil
                     || candidate == .dictation && other.holdKey != nil)
-            if binding.conflicts(with: other, holdsModifier: holdsModifier) {
-                return displayName(of: candidate)
-            }
         }
-        return nil
     }
 
     /// Every action that could hold a binding: the search space for conflicts and the map.
@@ -357,7 +357,7 @@ final class HotKeyManager {
         return actions
     }
 
-    private func displayName(of action: HotKeyAction) -> String {
+    func displayName(of action: HotKeyAction) -> String {
         switch action {
         case .togglePalette:
             return "App Launcher"

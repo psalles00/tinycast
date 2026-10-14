@@ -151,6 +151,7 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
     }
 
     func hide(restoreFocus: Bool) {
+        core.psFavoriteFolders.open(nil)
         NotesPanel.refusesInheritedKey = previousOwnWindow?.isVisible != true
         panel?.orderOut(nil)
         NotesPanel.refusesInheritedKey = false
@@ -396,6 +397,13 @@ final class PaletteWindowController: NSObject, NSWindowDelegate {
         // Handled at the panel: a focused preview answers Escape before the palette's own handler.
         panel.onEscape = { [weak self] in
             guard let self else { return false }
+            if core.palette.mode == .launcher, core.palette.query.isEmpty,
+                !core.palette.menuOpen, !core.palette.isControlListOpen,
+                core.psFavoriteFolders.openID != nil
+            {
+                core.psFavoritesCoordinator.showFolder(nil)
+                return true
+            }
             if core.palette.mode == .customCommandEditor, !core.palette.isComposing {
                 core.customCommandCoordinator.cancelCustomCommandEditing()
                 return true

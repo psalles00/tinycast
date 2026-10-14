@@ -22,6 +22,11 @@ struct LauncherList: View {
     let onDropped: () -> Void
     /// The `Use "…" with` section, always last; nil when nothing is typed.
     var fallbacks: FallbackSection?
+    var favoriteGrid: [FavoriteGridEntry]?
+    var favoriteFolderName: String?
+    var onFavoriteActivate: ((FavoriteGridEntry) -> Void)?
+    var onFavoriteActions: ((FavoriteGridEntry) -> Void)?
+    var onBackFromFolder: (() -> Void)?
     @Environment(RunningAppsMonitor.self) private var runningApps
 
     /// What the fallback section draws and where its rows go, addressed by position.
@@ -58,6 +63,7 @@ struct LauncherList: View {
 
     private enum Row: Identifiable {
         case header(String)
+        case favoriteHeader
         /// Its own case, because only this header carries a gear.
         case fallbackHeader(String)
         case card(LeadCard)
@@ -68,6 +74,7 @@ struct LauncherList: View {
         var id: String {
             switch self {
             case .header(let title): return "header-" + title
+            case .favoriteHeader: return "favorites-header"
             case .fallbackHeader: return "fallback-header"
             case .card(let card): return card.rowID
             case .favorites: return "favorites-grid"
@@ -78,7 +85,9 @@ struct LauncherList: View {
     }
 
     private var firstRowSelected: Bool {
-        card != nil ? cardSelected : selectedRowID != nil && selectedRowID == results.first?.id
+        let first = favoriteGrid?.first?.id
+            ?? (favoriteGrid == nil ? results.first?.id : results.dropFirst(favoriteCount).first?.id)
+        return card != nil ? cardSelected : selectedRowID != nil && selectedRowID == first
     }
 
     /// Every row the fallback section contributes, always after the results.
@@ -99,11 +108,11 @@ struct LauncherList: View {
         let rest = results.dropFirst(pinnedCount + matchCount)
         var grouped: [AppEntry.Kind: [AppEntry]] = [:]
         for app in rest { grouped[app.kind, default: []].append(app) }
-        if !favorites.isEmpty {
-            rows.append(.header("Favorites"))
+        if !favorites.isEmpty || favoriteGrid?.isEmpty == false || onBackFromFolder != nil {
+            rows.append(.favoriteHeader)
             rows.append(
                 .favorites(
-                    favorites.enumerated().map {
+                    favoriteGrid ?? favorites.enumerated().map {
                         FavoriteGridEntry(app: $1, slot: FavoriteSlots.digit(at: $0))
                     }))
         }
@@ -141,7 +150,7 @@ struct LauncherList: View {
     var body: some View {
         let rows = rows
         return Group {
-            if results.isEmpty && card == nil && fallbacks == nil {
+            if results.isEmpty && favoriteGrid?.isEmpty != false && onBackFromFolder == nil && card == nil && fallbacks == nil {
                 EmptyResults(text: "No apps found")
             } else {
                 ScrollViewReader { proxy in
@@ -149,6 +158,18 @@ struct LauncherList: View {
                         LazyVStack(spacing: 0) {
                             ForEach(rows) { row in
                                 switch row {
+                                case .favoriteHeader:
+                                    if let onBackFromFolder, let favoriteFolderName {
+                                        HStack {
+                                            Button("‹ Favoritos", action: onBackFromFolder).buttonStyle(.plain)
+                                            Text("› \(favoriteFolderName)").foregroundStyle(Theme.Colors.textSecondary)
+                                            Spacer()
+                                        }
+                                        .font(Theme.Typography.sectionHeader)
+                                        .padding(.vertical, metrics.spacing.sm)
+                                    } else {
+                                        SectionHeader(title: "Favorites", isFirst: row.id == rows.first?.id)
+                                    }
                                 case .header(let title):
                                     SectionHeader(title: title, isFirst: row.id == rows.first?.id)
                                 case .fallbackHeader(let title):
@@ -167,8 +188,14 @@ struct LauncherList: View {
                                     FavoriteGridView(
                                         favorites: favorites,
                                         selectedRowID: selectedRowID,
-                                        onActivate: onActivate,
-                                        onActions: onActions
+                                        onActivate: { entry in
+                                            if let onFavoriteActivate { onFavoriteActivate(entry) }
+                                            else if let app = entry.app { onActivate(app) }
+                                        },
+                                        onActions: { entry in
+                                            if let onFavoriteActions { onFavoriteActions(entry) }
+                                            else if let app = entry.app { onActions(app) }
+                                        }
                                     )
                                 case .app(let app, let slot):
                                     AppRow(

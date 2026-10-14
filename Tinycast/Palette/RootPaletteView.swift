@@ -471,6 +471,7 @@ struct RootPaletteView: View {
             .onDisappear {
                 menuPanel.hide()
                 (hostWindow as? PalettePanel)?.onHeaderFieldBoundaryArrow = nil
+                (hostWindow as? PalettePanel)?.onFavoriteGridArrow = nil
             }
             // The first show builds this view after `prepare`, so no handler saw that reset.
             .onAppear {
@@ -1379,6 +1380,17 @@ struct RootPaletteView: View {
     /// Right at an inline field's end and Left at its start continue the same ring as Tab.
     private func installHeaderArrowHandler(in window: NSWindow?) {
         guard let panel = window as? PalettePanel else { return }
+        panel.onFavoriteGridArrow = { event in
+            guard vm.mode == .launcher, vm.query.isEmpty, !vm.isComposing,
+                !menuOpen, !vm.isControlListOpen, !isCollapsed, argumentFocused == nil,
+                event.modifierFlags.isDisjoint(with: [.command, .control, .option, .shift])
+            else { return false }
+            switch event.keyCode {
+            case 123: return moveHorizontally(-1)
+            case 124: return moveHorizontally(1)
+            default: return false
+            }
+        }
         panel.onHeaderFieldBoundaryArrow = { boundary in
             guard !menuOpen, !vm.isControlListOpen, !isCollapsed,
                 let accessory = headerAccessory, !accessory.fieldNames.isEmpty

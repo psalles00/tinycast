@@ -25,6 +25,7 @@ struct LauncherScreen: PaletteScreen {
     private let pinsFavorites: Bool
     /// How many of `results` are pinned favorites; zero unless the section shows.
     private let favoriteCount: Int
+    private let favoriteGrid: [FavoriteGridEntry]
     /// How many follow the favorites as Meetings; zero unless the field is empty.
     private let meetingCount: Int
     /// How many follow the meetings as Suggestions; zero unless the field is empty.
@@ -76,8 +77,16 @@ struct LauncherScreen: PaletteScreen {
         // After the calculator: `#FF5733` is never arithmetic, so the two can't both answer.
         let color = calc == nil && pinned == nil ? ColorValue.parse(vm.query) : nil
         let fallbacks = core.fallbackCoordinator.entries(for: vm.query)
-        let entries = results.map(Row.entry) + fallbacks.map { Row.fallback($0.fallback, $0.entry) }
         let pinsFavorites = vm.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let grid = pinsFavorites ? core.psFavoriteFolders.entries(for: Array(results.prefix(ordered.favoriteCount))) : []
+        let gridRows = grid.map { entry -> Row in
+            switch entry.content {
+            case .app(let app): return .entry(app)
+            case .folder(let folder, _): return .favoriteFolder(folder)
+            }
+        }
+        let visible = pinsFavorites ? gridRows + results.dropFirst(ordered.favoriteCount).map(Row.entry) : results.map(Row.entry)
+        let entries = visible + fallbacks.map { Row.fallback($0.fallback, $0.entry) }
         // At most one of them leads, so the flat index keeps a single-row offset.
         let meeting = pinsFavorites ? meeting : nil
         self.meeting = meeting
@@ -87,6 +96,7 @@ struct LauncherScreen: PaletteScreen {
         self.color = color
         self.pinsFavorites = pinsFavorites
         self.favoriteCount = pinsFavorites ? ordered.favoriteCount : 0
+        self.favoriteGrid = grid
         self.meetingCount = pinsFavorites ? ordered.meetingCount : 0
         self.suggestionCount = pinsFavorites ? ordered.suggestionCount : 0
         self.matchCount = matchCount
@@ -107,6 +117,7 @@ struct LauncherScreen: PaletteScreen {
         case meeting(MeetingEvent)
         case color(ColorValue)
         case entry(AppEntry)
+        case favoriteFolder(PSFavoriteFolder)
         /// Prefixed, because the same command can also be a ranked hit above its own fallback row.
         case fallback(Fallback, AppEntry)
 
@@ -116,6 +127,7 @@ struct LauncherScreen: PaletteScreen {
             case .meeting: return "meeting-card"
             case .color: return "color-card"
             case .entry(let app): return app.id
+            case .favoriteFolder(let folder): return "ps-favorite-folder-" + folder.id.uuidString
             case .fallback(let fallback, _): return "fallback-" + fallback.id
             }
         }
@@ -134,6 +146,7 @@ struct LauncherScreen: PaletteScreen {
         case .meeting(let meeting):
             return meeting.link == nil ? "Open in Calendar" : "Join Meeting"
         case .entry(let app): return app.kind.descriptor.openVerb
+        case .favoriteFolder: return "Abrir pasta"
         case .fallback(let fallback, _): return fallback.openVerb
         case nil: return "Open Application"
         }
@@ -204,7 +217,7 @@ struct LauncherScreen: PaletteScreen {
     private func isCardSelected(_ selection: Int) -> Bool {
         switch row(at: selection) {
         case .calc, .meeting, .color: return true
-        case .entry, .fallback, nil: return false
+        case .entry, .favoriteFolder, .fallback, nil: return false
         }
     }
 
@@ -222,6 +235,7 @@ struct LauncherScreen: PaletteScreen {
 
     func actions(at selection: Int) -> PopoverMenuContent? {
         switch row(at: selection) {
+        case .favoriteFolder(let folder): return core.psFavoritesCoordinator.folderMenu(folder)
         case .calc(let result):
             return result.isActionable ? CalcActionsMenu.content(result: result, core: core) : nil
         case .color(let color):
@@ -248,6 +262,7 @@ struct LauncherScreen: PaletteScreen {
 
     func activate(at selection: Int) {
         switch row(at: selection) {
+        case .favoriteFolder(let folder): core.psFavoritesCoordinator.showFolder(folder.id)
         // Error cards no-op — copyCalculatorResult only acts on value payloads.
         case .calc(let result): core.calculatorCoordinator.copyCalculatorResult(result)
         case .color(let color):
@@ -369,8 +384,13 @@ struct LauncherScreen: PaletteScreen {
 
     /// ⌘1–⌘9/⌘0 — launch a favorite by position, in either palette size.
     private func launchFavorite(at index: Int) -> Bool {
-        guard let app = pinnedFavorites.dropFirst(index).first else { return false }
-        core.launcherCoordinator.launch(app)
+        if core.paletteCoordinator.paletteIsCollapsed {
+            guard let app = pinnedFavorites.dropFirst(index).first else { return false }
+            core.launcherCoordinator.launch(app)
+            return true
+        }
+        guard favoriteGrid.indices.contains(index) else { return false }
+        activate(at: index + (leadCard == nil ? 0 : 1))
         return true
     }
 
@@ -379,6 +399,15 @@ struct LauncherScreen: PaletteScreen {
 
     /// ⌥⌘↑/↓ — swap with the neighbouring favorite; the ends of the section have nowhere to go.
     func moveFavorite(_ delta: Int, at selection: Int) -> Bool {
+        if core.psFavoriteFolders.openID != nil {
+            let apps = favoriteGrid.compactMap(\.app)
+            guard let app = entry(at: selection), let index = apps.firstIndex(of: app),
+                apps.indices.contains(index + delta)
+            else { return false }
+            guard core.psFavoriteFolders.exchange(app.preferenceKey, with: apps[index + delta].preferenceKey) else { return false }
+            follow(app)
+            return true
+        }
         guard let app = entry(at: selection), let index = favoriteIndex(of: app) else { return false }
         let target = index + delta
         guard target >= 0, target < favoriteCount else { return false }
@@ -393,11 +422,13 @@ struct LauncherScreen: PaletteScreen {
     )
         -> AppActionsMenu.FavoriteActions
     {
-        let index = favoriteIndex(of: app)
+        let index = core.psFavoriteFolders.openID == nil
+            ? favoriteIndex(of: app) : favoriteGrid.firstIndex(where: { $0.app == app })
+        let count = core.psFavoriteFolders.openID == nil ? favoriteCount : favoriteGrid.count
         return AppActionsMenu.FavoriteActions(
             isFavorite: favorites.isFavorite(app),
             canMoveUp: index.map { $0 > 0 } ?? false,
-            canMoveDown: index.map { $0 < favoriteCount - 1 } ?? false,
+            canMoveDown: index.map { $0 < count - 1 } ?? false,
             toggle: { _ = toggleFavorite(at: selection) },
             move: { _ = moveFavorite($0, at: selection) })
     }
@@ -428,12 +459,15 @@ struct LauncherScreen: PaletteScreen {
 
     /// The list reorders under an action; keep the highlight and the scroll on the row that moved.
     private func follow(_ app: AppEntry) {
-        guard let index = reorderedResults().entries.firstIndex(of: app) else { return }
+        let ordered = reorderedResults()
+        let grid = core.psFavoriteFolders.entries(for: Array(ordered.entries.prefix(ordered.favoriteCount)))
+        guard let index = grid.firstIndex(where: { $0.app == app }) else { return }
         select(row: index)
     }
 
     private func selectFavorite(at index: Int) {
-        let count = reorderedResults().favoriteCount
+        let ordered = reorderedResults()
+        let count = core.psFavoriteFolders.entries(for: Array(ordered.entries.prefix(ordered.favoriteCount))).count
         select(row: min(max(index, 0), max(count - 1, 0)))
     }
 
@@ -458,6 +492,13 @@ struct LauncherScreen: PaletteScreen {
     var compactFavorites: [AppEntry] { Array(pinnedFavorites.prefix(5)) }
 
     var hasUnshownFavorites: Bool { favoriteCount > compactFavorites.count }
+
+    func move(_ delta: Int, axis: PaletteAxis, from selection: Int) -> Int? {
+        guard pinsFavorites else { return nil }
+        return FavoriteGridLayout.selection(
+            delta: delta, horizontal: axis == .horizontal, from: selection,
+            start: leadCard == nil ? 0 : 1, count: favoriteGrid.count, total: rows.count)
+    }
 
     func body(selection: Int, scroll: ScrollIntent) -> AnyView {
         AnyView(content(selection: selection, scroll: scroll))
@@ -493,7 +534,17 @@ struct LauncherScreen: PaletteScreen {
                 openActions()
             },
             onDropped: { core.paletteCoordinator.dragLanded() },
-            fallbacks: fallbackSection
+            fallbacks: fallbackSection,
+            favoriteGrid: pinsFavorites ? favoriteGrid : nil,
+            favoriteFolderName: core.psFavoriteFolders.openFolder?.name,
+            onFavoriteActivate: { entry in
+                if let index = rows.firstIndex(where: { $0.id == entry.id }) { activate(at: index) }
+            },
+            onFavoriteActions: { entry in
+                if let index = rows.firstIndex(where: { $0.id == entry.id }) { vm.selection = index }
+                openActions()
+            },
+            onBackFromFolder: core.psFavoriteFolders.openID == nil ? nil : { core.psFavoritesCoordinator.showFolder(nil) }
         )
     }
 

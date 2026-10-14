@@ -44,6 +44,9 @@ final class AppCore {
     @ObservationIgnored private var chatsRunTheirOwnTools: Bool?
     @ObservationIgnored private let iconStyle = IconStyleMonitor()
     let favorites = FavoritesStore()
+    let psFavoriteFolders = PSFavoriteFolderStore(
+        url: AppPaths.applicationSupport().appendingPathComponent("ps-favorite-folders.json"))
+    @ObservationIgnored private(set) lazy var psFavoritesCoordinator = PSFavoritesCoordinator(core: self)
     let visibility = VisibilityStore()
     let aliases = AliasStore()
     let fallbacks = FallbackStore()
